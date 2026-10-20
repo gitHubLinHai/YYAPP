@@ -100,3 +100,5 @@ android-shell/.gradle/
 android-shell/app/build/
 android-shell/local.properties
 release/*.apk
+android-shell/app/src/main/assets/
+android-shell/app/src/main/res/mipmap-xxhdpi/
