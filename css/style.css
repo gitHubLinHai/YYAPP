@@ -227,3 +227,25 @@ body {
   animation: fall linear forwards;
 }
 @keyframes fall { to { transform: translateY(110vh) rotate(720deg); } }
+
+/* ---------- 家长中心 ---------- */
+.rp-title { font-weight: bold; font-size: 17px; color: #33557a; margin-bottom: 6px; }
+.rp-row { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-top: 1px dashed #eee; }
+.rp-g { width: 88px; font-size: 15px; font-weight: bold; color: #444; flex: none; }
+.rp-stars { flex: 1; display: flex; flex-wrap: wrap; gap: 4px; font-size: 14px; }
+.rp-star { background: #f2f6fa; border-radius: 8px; padding: 3px 7px; color: #c3cfdb; letter-spacing: 1px; }
+.rp-star.on { background: #fff6e0; color: #e59400; }
+.rp-note { font-size: 13px; color: #98a; margin: 4px 0 12px; line-height: 1.6; }
+.upd-found { background: #f2fbf5; border: 2px solid #bfe8cd; border-radius: 14px; padding: 12px; font-size: 16px; font-weight: bold; color: #1e8c44; text-align: center; }
+
+/* ---------- 护眼/更新 全屏提示 ---------- */
+#eyeOverlay {
+  position: fixed; inset: 0; z-index: 100; background: rgba(30, 60, 90, .92);
+  display: flex; align-items: center; justify-content: center;
+}
+.eye-card { text-align: center; color: #fff; padding: 30px; }
+.eye-title { font-size: 24px; font-weight: bold; margin-top: 12px; }
+.eye-sub { font-size: 15px; opacity: .85; margin-top: 8px; line-height: 1.6; }
+.eye-count { font-size: 64px; font-weight: bold; margin-top: 14px; color: #ffd54f; }
+.eye-skip { font-size: 14px; opacity: .7; text-decoration: underline; cursor: pointer; }
+

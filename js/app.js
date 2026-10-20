@@ -133,14 +133,68 @@
       '<div class="menu-card" data-go="phonics"><div class="micon">🔤</div><div class="mname">自然拼读</div><div class="mdesc">字母发音小课堂</div></div>' +
       '<div class="menu-card" data-go="wrong"><div class="micon">📕</div><div class="mname">错题本</div><div class="mdesc">' + Object.keys(save.wrong).length + ' 个词要复习</div></div>' +
       '</div>' +
-      '<div style="text-align:center;margin-top:16px"><button class="btn small ghost" id="resetBtn">家长入口：重置进度</button></div>';
+      '<div style="text-align:center;margin-top:16px"><button class="btn small ghost" id="parentBtn">👑 家长中心</button></div>';
     $all('.grade-card').forEach(function (el) {
       el.onclick = function () { showMap(el.getAttribute('data-grade')); };
     });
     $('[data-go=phonics]').onclick = function () { showPhonics(); };
     $('[data-go=wrong]').onclick = function () { showWrong(); };
+    $('#parentBtn').onclick = function () { showParent(); };
+  }
+
+  /* ================= 家长中心 ================= */
+  function showParent() {
+    var rows = ['g1', 'g2', 'g3'].map(function (gid) {
+      var g = window.DB[gid];
+      var stars = g.units.map(function (u, i) {
+        var st = save.stars[gid + 'u' + i] || 0;
+        return '<span class="rp-star' + (st ? ' on' : '') + '">' + (st ? '★'.repeat(st) : '·') + '</span>';
+      }).join('');
+      return '<div class="rp-row"><div class="rp-g">' + g.icon + g.title + '</div><div class="rp-stars">' + stars + '</div></div>';
+    }).join('');
+    var doneCnt = 0, totalUnits = 0;
+    ['g1', 'g2', 'g3'].forEach(function (gid) {
+      totalUnits += window.DB[gid].units.length;
+      window.DB[gid].units.forEach(function (u, i) { if ((save.stars[gid + 'u' + i] || 0) > 0) doneCnt++; });
+    });
+    app.innerHTML =
+      '<div class="topbar"><button class="back" id="back">←</button><h2>👑 家长中心</h2></div>' +
+      '<div class="card"><div class="rp-title">📊 学习报告</div>' +
+      '<div class="stat-row" style="justify-content:flex-start;margin:10px 0">' +
+      '<div class="stat">🔥 连续 ' + save.streak + ' 天</div>' +
+      '<div class="stat">⭐ ' + totalStars() + ' 星</div>' +
+      '<div class="stat">✅ ' + doneCnt + '/' + totalUnits + ' 关</div>' +
+      '<div class="stat">📕 错词 ' + Object.keys(save.wrong).length + '</div></div>' +
+      rows + '</div>' +
+      '<div class="card"><div class="rp-title">🔄 版本与更新</div>' +
+      '<div class="rp-note">当前版本：' + (window.AppUpdate ? window.AppUpdate.version() : '未知') +
+      (window.AppUpdate && window.AppUpdate.inApp() ? '' : '<br>（网页预览不支持在线更新，手机上可用）') + '</div>' +
+      '<button class="btn blue" id="checkUpd">检查更新</button>' +
+      '<div id="updBox" style="margin-top:10px"></div></div>' +
+      '<div class="card"><div class="rp-title">⚠️ 危险操作</div>' +
+      '<button class="btn ghost" id="resetBtn">清空所有进度（重置）</button></div>';
+    $('#back').onclick = showHome;
     $('#resetBtn').onclick = function () {
-      if (confirm('确定要清空所有闯关进度、金币和错题本吗？')) { save = { coins: 0, stars: {}, wrong: {}, streak: 0, last: '', phonics: {} }; persist(); toast('已重置'); showHome(); }
+      if (confirm('确定要清空所有闯关进度、金币和错题本吗？')) { save = { coins: 0, stars: {}, wrong: {}, streak: 0, last: '', phonics: {} }; persist(); toast('已重置'); showParent(); }
+    };
+    $('#checkUpd').onclick = function () {
+      var box = $('#updBox');
+      window.AppUpdate.check(false, function (st) {
+        if (st.state === 'uptodate') { toast('已是最新版本 v' + st.version); }
+        else if (st.state === 'nopreview') { toast('网页预览不支持，请在手机App里检查'); }
+        else if (st.state === 'error') { toast(st.msg || '检查失败，请检查网络'); }
+        else if (st.state === 'found') {
+          box.innerHTML = '<div class="upd-found">发现新版本 v' + st.version + '<br><span style="font-size:13px;color:#888">' + st.notes + '</span></div>' +
+            '<button class="btn green" id="doUpd">立即更新</button>';
+          $('#doUpd').onclick = function () { st.go(); };
+        } else if (st.state === 'downloading') {
+          box.innerHTML = '<div class="qbar"><i style="width:' + Math.round(st.progress * 100) + '%"></i></div>' +
+            '<div style="text-align:center;font-size:13px;color:#888">下载中 ' + Math.round(st.progress * 100) + '%</div>';
+        } else if (st.state === 'installed') {
+          box.innerHTML = '<div class="upd-found">✅ 更新完成！</div><button class="btn green" id="restartApp">重启应用生效</button>';
+          $('#restartApp').onclick = function () { plus.runtime.restart(); };
+        }
+      });
     };
   }
 
@@ -432,8 +486,11 @@
       '<div class="tabs"><div class="tab' + (phTab === 'letters' ? ' on' : '') + '" data-t="letters">字母 A-Z</div>' +
       '<div class="tab' + (phTab === 'combos' ? ' on' : '') + '" data-t="combos">字母组合</div></div>' +
       '<div class="ph-grid">' + items + '</div>' +
-      '<div id="phDetail"></div>';
+      '<div id="phDetail"></div>' +
+      (phTab === 'letters' ? '<button class="btn blue" id="phQuizBtn" style="margin-top:6px">拼读小测验 🎯（听音选字母）</button>' : '');
     $('#back').onclick = showHome;
+    var pq = $('#phQuizBtn');
+    if (pq) pq.onclick = startPhQuiz;
     $all('.tab').forEach(function (t) {
       t.onclick = function () { phTab = t.getAttribute('data-t'); showPhonics(); };
     });
@@ -468,7 +525,110 @@
     }
   }
 
+  /* ================= 拼读小测验 ================= */
+  var phq = null;
+  function startPhQuiz() {
+    var letters = shuffle(window.DB.phonics.letters).slice(0, 6);
+    var qs = letters.map(function (it) {
+      var word = it.words[Math.floor(Math.random() * it.words.length)];
+      var others = sample(window.DB.phonics.letters, 3, [it]).map(function (o) { return o.l; });
+      return { it: it, word: word, ans: it.l, opts: shuffle([it.l].concat(others)) };
+    });
+    phq = { qs: qs, idx: 0, right: 0, locked: false };
+    renderPhQ();
+  }
+  function renderPhQ() {
+    var q = phq.qs[phq.idx];
+    phq.locked = false;
+    app.innerHTML =
+      '<div class="topbar" style="margin-bottom:8px"><button class="back" id="quitQuiz">✕</button>' +
+      '<h2 style="font-size:17px">🔤 拼读小测验</h2><span class="coins">💰 ' + save.coins + '</span></div>' +
+      '<div class="qbar"><i style="width:' + (phq.idx / phq.qs.length * 100) + '%"></i></div>' +
+      '<div class="qcount">第 ' + (phq.idx + 1) + ' / ' + phq.qs.length + ' 题</div>' +
+      '<div class="qprompt">🎧 听单词，它开头的字母是？</div>' +
+      '<div class="replay"><button id="replay">🔊</button></div>' +
+      '<div class="opts">' + q.opts.map(function (o) {
+        return '<div class="opt big" data-l="' + o + '">' + o + ' ' + o.toLowerCase() + '</div>';
+      }).join('') + '</div>';
+    $('#quitQuiz').onclick = function () { phq = null; showPhonics(); };
+    $('#replay').onclick = function () { say(q.word, 'words'); };
+    say(q.word, 'words');
+    $all('.opt').forEach(function (el) {
+      el.onclick = function () {
+        if (phq.locked) return;
+        phq.locked = true;
+        var ok = el.getAttribute('data-l') === q.ans;
+        if (ok) { el.classList.add('correct'); chime(true); phq.right++; }
+        else {
+          el.classList.add('wrong'); chime(false);
+          $all('.opt').forEach(function (o2) {
+            if (o2.getAttribute('data-l') === q.ans) o2.classList.add('correct'); else o2.classList.add('dim');
+          });
+        }
+        setTimeout(function () {
+          phq.idx++;
+          if (phq.idx >= phq.qs.length) {
+            save.coins += phq.right; persist(); touchStreak();
+            var right = phq.right; phq = null;
+            if (right === 6) confetti();
+            app.innerHTML =
+              '<div class="result-card card"><div style="font-size:70px">' + (right >= 5 ? '🏆' : '🌟') + '</div>' +
+              '<div class="rmsg">答对 ' + right + '/6 题</div>' +
+              '<div class="rcoins">获得 💰' + right + ' 金币</div>' +
+              '<button class="btn green" id="phAgain">再来一轮 🔁</button>' +
+              '<button class="btn ghost" id="phBack" style="margin-top:10px">返回拼读课堂</button></div>';
+            $('#phAgain').onclick = startPhQuiz;
+            $('#phBack').onclick = showPhonics;
+          } else renderPhQ();
+        }, ok ? 750 : 1400);
+      };
+    });
+  }
+
+  /* ================= 护眼提醒（每20分钟休息20秒） ================= */
+  var eyeTimer = null;
+  function startEyeTimer() {
+    clearTimeout(eyeTimer);
+    eyeTimer = setTimeout(showEyeRest, 20 * 60 * 1000);
+  }
+  function showEyeRest() {
+    var left = 20;
+    var ov = document.createElement('div');
+    ov.id = 'eyeOverlay';
+    ov.innerHTML = '<div class="eye-card"><div style="font-size:60px">👀</div>' +
+      '<div class="eye-title">小眼睛，休息一下～</div>' +
+      '<div class="eye-sub">看看窗外最远的地方，数到 20</div>' +
+      '<div class="eye-count" id="eyeCount">20</div></div>';
+    document.body.appendChild(ov);
+    var iv = setInterval(function () {
+      left--;
+      var el = $('#eyeCount');
+      if (el) el.textContent = left;
+      if (left <= 0) { clearInterval(iv); ov.remove(); startEyeTimer(); }
+    }, 1000);
+  }
+
   /* ================= 启动 ================= */
   window.addEventListener('error', function (e) { if (window.console) console.error('AppError:', e.message); });
   showHome();
+  startEyeTimer();
+  // 启动后静默检查热更新（有新版本才弹提示）
+  if (window.AppUpdate) {
+    setTimeout(function () {
+      window.AppUpdate.check(true, function (st) {
+        if (st.state === 'found' && !$('#eyeOverlay')) {
+          var ov = document.createElement('div');
+          ov.id = 'eyeOverlay';
+          ov.innerHTML = '<div class="eye-card"><div style="font-size:56px">🎉</div>' +
+            '<div class="eye-title">发现新版本 v' + st.version + '</div>' +
+            '<div class="eye-sub">' + (st.notes || '') + '</div>' +
+            '<button class="btn green" id="updNow" style="width:auto;padding:11px 30px;margin-top:14px">立即更新</button>' +
+            '<div style="margin-top:10px"><span class="eye-skip" id="updLater">稍后再说</span></div></div>';
+          document.body.appendChild(ov);
+          $('#updNow').onclick = function () { st.go(); };
+          $('#updLater').onclick = function () { ov.remove(); };
+        }
+      });
+    }, 3000);
+  }
 })();
