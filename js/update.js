@@ -5,9 +5,10 @@
 window.AppUpdate = (function () {
   'use strict';
   // 更新文件托管在 GitHub 仓库 release/ 目录，经 jsDelivr CDN 分发（按顺序尝试）
+  // fastly 节点在国内直连可用，放最前
   var CDNS = [
-    'https://cdn.jsdelivr.net/gh/gitHubLinHai/YYAPP@main/release/',
     'https://fastly.jsdelivr.net/gh/gitHubLinHai/YYAPP@main/release/',
+    'https://cdn.jsdelivr.net/gh/gitHubLinHai/YYAPP@main/release/',
     'https://raw.githubusercontent.com/gitHubLinHai/YYAPP/main/release/'
   ];
 
