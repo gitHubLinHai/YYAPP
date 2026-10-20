@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title>err-test</title></head>
+<body>
+<script>
+  window._errs = [];
+  window.onerror = function (m, s, l, c) { window._errs.push(m + ' @' + (s || '').split('/').pop() + ':' + l + ':' + c); return false; };
+</script>
+<script src="data/grade1.js"></script>
+<script src="data/grade2.js"></script>
+<script src="data/grade3.js"></script>
+<script src="data/phonics.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
