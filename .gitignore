@@ -95,3 +95,8 @@ $RECYCLE.BIN/
 
 # Windows shortcuts
 *.lnk
+### Android shell build
+android-shell/.gradle/
+android-shell/app/build/
+android-shell/local.properties
+release/*.apk
