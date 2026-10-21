@@ -1,0 +1,37 @@
+const assert = require('node:assert/strict');
+require('../js/learning.js');
+const L = globalThis.Learning;
+const store = { review: {} };
+const day = 86400000, now = new Date(2026, 9, 21, 10).getTime();
+assert.equal(L.spellingCorrect('  APPLE  ', 'apple'), true);
+assert.equal(L.spellingCorrect('stand   up', 'stand up'), true);
+assert.equal(L.spellingCorrect('o’clock', "o'clock"), true);
+assert.equal(L.spellingCorrect('color', 'colour'), true);
+assert.equal(L.spellingCorrect('aple', 'apple'), false);
+assert.equal(L.spellingCorrect('oclock', "o'clock"), false);
+assert.equal(L.steady({ level: 5 }), false, '旧版总等级不能冒充分项掌握');
+L.recordAttempt(store, 'apple', 'listen', true, now);
+L.recordAttempt(store, 'apple', 'zh', true, now);
+L.recordAttempt(store, 'apple', 'write', false, now);
+assert.equal(store.review.apple.skills.listen.level, 1);
+assert.equal(store.review.apple.skills.spelling.level, 0);
+assert.ok(L.planTypes(store.review.apple).some(t => t === 'write' || t === 'dictate'));
+assert.equal(L.needsWork(store.review.apple), true);
+L.recordAttempt(store, 'apple', 'write', true, now + 600000);
+assert.equal(store.review.apple.skills.spelling.level, 1);
+L.recordAttempt(store, 'apple', 'dictate', true, now + 601000);
+assert.equal(store.review.apple.skills.spelling.level, 1, '即时重答不提高掌握等级');
+assert.equal(L.needsWork(store.review.apple), false);
+assert.equal(L.steady(store.review.apple), false);
+for (const offset of [2, 5]) for (const type of ['listen', 'zh', 'dictate']) {
+  const evidence = L.recordAttempt(store, 'apple', type, true, now + offset * day);
+  assert.equal(evidence.delayed, type === 'listen', '同词同轮仅首次作答计入独立延迟复测');
+}
+assert.equal(L.steady(store.review.apple), true);
+L.recordAttempt(store, 'apple', 'write', false, now + 6 * day);
+assert.equal(L.steady(store.review.apple), false, '拼写再次遗忘需回到巩固');
+assert.equal(store.review.apple.skills.listen.level, 3, '拼写错误不清空听辨成绩');
+assert.equal(store.review.apple.due, now + 6 * day + 600000);
+const legacy = { level: 4, due: 1, last: 1 };
+assert.deepEqual(L.planTypes(legacy).slice().sort(), ['dictate', 'listen', 'zh'].sort());
+console.log('真实掌握验证通过：完整拼写判分、分项记录、延迟复测、同日去重、弱项调度和旧记录兼容。');

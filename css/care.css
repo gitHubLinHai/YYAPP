@@ -1,0 +1,70 @@
+:root { --surface: #fff; --soft: #e9f0e3; --button: #28745b; }
+[data-theme="warm"] { --paper: #f5eddb; --surface: #fff8e9; --soft: #ece1c8; --ink: #463e30; --muted: #776b54; --green: #526e42; --line: #e1d6bd; --button: #526e42; }
+[data-theme="dark"] { color-scheme: dark; --paper: #1c2521; --surface: #28352e; --soft: #34483a; --ink: #e6eee5; --muted: #adbdaf; --green: #a1cfae; --line: #465b4a; --button: #326749; }
+[data-theme="warm"] body, [data-theme="dark"] body { background: var(--paper); color: var(--ink); }
+[data-theme="warm"] .card, [data-theme="dark"] .card,
+[data-theme="warm"] .flashcard, [data-theme="dark"] .flashcard,
+[data-theme="warm"] .unit, [data-theme="dark"] .unit,
+[data-theme="warm"] .stage, [data-theme="dark"] .stage,
+[data-theme="warm"] .practice-card, [data-theme="dark"] .practice-card,
+[data-theme="warm"] .course-strip, [data-theme="dark"] .course-strip,
+[data-theme="warm"] .vocab-word, [data-theme="dark"] .vocab-word,
+[data-theme="warm"] .vocab-source, [data-theme="dark"] .vocab-source,
+[data-theme="warm"] .ph-item, [data-theme="dark"] .ph-item,
+[data-theme="warm"] .wrong-row, [data-theme="dark"] .wrong-row,
+[data-theme="warm"] .opt, [data-theme="dark"] .opt,
+[data-theme="warm"] .sentence-context, [data-theme="dark"] .sentence-context,
+[data-theme="warm"] .back, [data-theme="dark"] .back,
+[data-theme="warm"] .stat, [data-theme="dark"] .stat { background: var(--surface); color: var(--ink); }
+[data-theme="warm"] .btn, [data-theme="dark"] .btn { background: var(--button); color: #fff; }
+[data-theme="warm"] .btn.ghost, [data-theme="dark"] .btn.ghost,
+[data-theme="warm"] .profile, [data-theme="dark"] .profile { background: var(--surface); color: var(--green); border-color: var(--line); }
+[data-theme="warm"] select, [data-theme="dark"] select,
+[data-theme="warm"] input, [data-theme="dark"] input,
+[data-theme="warm"] textarea, [data-theme="dark"] textarea { background: var(--surface); color: var(--ink); border-color: var(--line); }
+[data-theme="warm"] .today-card, [data-theme="dark"] .today-card,
+[data-theme="warm"] .recall-cue, [data-theme="dark"] .recall-cue,
+[data-theme="warm"] .vocab-entry, [data-theme="dark"] .vocab-entry { background: var(--soft); border-color: var(--line); }
+[data-theme="warm"] .today-copy p, [data-theme="dark"] .today-copy p,
+[data-theme="warm"] .today-progress, [data-theme="dark"] .today-progress,
+[data-theme="warm"] .fzh, [data-theme="dark"] .fzh,
+[data-theme="warm"] .pname, [data-theme="dark"] .pname,
+[data-theme="warm"] .rmsg, [data-theme="dark"] .rmsg { color: var(--ink); }
+[data-theme="warm"] .fex, [data-theme="dark"] .fex,
+[data-theme="warm"] .result-skills span, [data-theme="dark"] .result-skills span,
+[data-theme="warm"] .stage-number, [data-theme="dark"] .stage-number { background: var(--soft); color: var(--green); }
+[data-theme="warm"] .bottom-nav, [data-theme="dark"] .bottom-nav { background: var(--surface); }
+[data-theme="warm"] .vocab-grades button, [data-theme="dark"] .vocab-grades button { background: var(--surface); color: var(--ink); }
+[data-theme="warm"] .vocab-grades .selected, [data-theme="dark"] .vocab-grades .selected { background: var(--button); color: #fff; }
+[data-theme="dark"] .opt.correct { background: #234c33; color: #dff6e5; }
+[data-theme="dark"] .opt.wrong { background: #582f2b; color: #ffded5; }
+[data-theme="dark"] .upd-found { background: #294735; color: #e1f2df; border-color: #526f54; }
+[data-theme="dark"] .thin-track, [data-theme="dark"] .qbar { background: #485c49; }
+.eye-quick { display: flex; align-items: center; gap: 10px; padding: 12px 14px; margin-top: 16px; border: 1px solid var(--line); border-radius: 14px; width: 100%; text-align: left; background: var(--surface); color: var(--green); }
+.eye-quick span { font-size: 13px; font-weight: bold; white-space: nowrap; }
+.eye-quick small { flex: 1; color: var(--muted); font-size: 10px; line-height: 1.7; }
+.eye-quick b { font-size: 11px; border-radius: 20px; padding: 5px 10px; background: var(--soft); }
+.eye-quick[aria-pressed="true"] { border-color: var(--green); }
+#careOverlay { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; padding: 22px; background: #15271ee8; }
+.care-dialog { width: 100%; max-width: 390px; text-align: center; background: var(--surface); color: var(--ink); margin: 0; max-height: 90vh; overflow-y: auto; }
+.care-dialog h2 { font-size: 24px; }
+.care-mark { font-size: 46px; color: var(--green); }
+.care-count { font-size: 30px; color: var(--green); margin: 22px 0; }
+.check-row { display: flex; gap: 10px; align-items: center; font-size: 15px; }
+.check-row input { width: 20px; height: 20px; accent-color: var(--green); }
+.usage-row { display: flex; justify-content: space-between; padding: 15px 0; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+.usage-row strong { color: var(--ink); font-weight: normal; }
+.backup-text { display: block; width: 100%; min-height: 140px; resize: vertical; border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 15px; color: var(--ink); background: var(--surface); font: 12px/1.7 monospace; overflow-wrap: anywhere; }
+#restorePreview { font-size: 13px; line-height: 1.8; margin-top: 16px; overflow-wrap: anywhere; }
+[data-font="large"] .helper, [data-font="large"] .rp-note { font-size: 16px; line-height: 1.9; }
+[data-font="large"] .qprompt { font-size: 22px; }
+[data-font="large"] .fword { font-size: 48px; overflow-wrap: anywhere; }
+[data-font="large"] .fzh { font-size: 24px; }
+[data-font="large"] .fex { font-size: 20px; }
+[data-font="large"] .opt { font-size: 24px; }
+[data-font="large"] .stage small, [data-font="large"] .vocab-word small { font-size: 14px; }
+[data-font="large"] .practice-card p, [data-font="large"] .vocab-entry small { font-size: 13px; }
+[data-font="large"] .skill-report-row span, [data-font="large"] .usage-row { font-size: 16px; }
+[data-font="large"] .weak-word p, [data-font="large"] .vocab-source p { font-size: 14px; }
+[data-font="large"] .vocab-word strong, [data-font="large"] .utitle { font-size: 21px; }
+@media (max-width: 360px) { .eye-quick { gap: 6px; padding: 12px 10px; } .eye-quick small { font-size: 9px; } }

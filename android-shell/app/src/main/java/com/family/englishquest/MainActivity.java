@@ -3,6 +3,11 @@ package com.family.englishquest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.os.Bundle;
+import android.os.Build;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.net.NetworkInfo;
 import android.view.KeyEvent;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
@@ -45,9 +50,14 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         wwwDir = new File(getFilesDir(), "www");
-        if (!new File(wwwDir, "index.html").exists()) {
-            copyAssets("www", wwwDir);
-        }
+        try {
+            android.content.pm.PackageInfo pkg = getPackageManager().getPackageInfo(getPackageName(), 0);
+            if (!new File(wwwDir, "index.html").exists() || pkg.versionCode > activeCode()) {
+                copyAssets("www", wwwDir);
+                getSharedPreferences("app", MODE_PRIVATE).edit().putInt("code", pkg.versionCode)
+                        .putString("name", pkg.versionName).commit();
+            }
+        } catch (Exception e) { throw new RuntimeException("初始化资源失败", e); }
         web = new WebView(this);
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
@@ -108,7 +118,39 @@ public class MainActivity extends Activity {
         });
     }
 
+    private Network wifiNetwork() {
+        ConnectivityManager cm = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+        if (cm == null) return null;
+        if (Build.VERSION.SDK_INT >= 23) {
+            Network n = cm.getActiveNetwork();
+            if (n == null) return null;
+            NetworkCapabilities caps = cm.getNetworkCapabilities(n);
+            return caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
+                    && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) ? n : null;
+        }
+        NetworkInfo active = cm.getActiveNetworkInfo();
+        if (active == null || !active.isConnected() || active.getType() != ConnectivityManager.TYPE_WIFI) return null;
+        for (Network n : cm.getAllNetworks()) {
+            NetworkInfo info = cm.getNetworkInfo(n);
+            if (info != null && info.isConnected() && info.getType() == ConnectivityManager.TYPE_WIFI) return n;
+        }
+        return null;
+    }
+
     private class Bridge {
+        @JavascriptInterface
+        public String networkType() {
+            try {
+                if (wifiNetwork() != null) return "wifi";
+                ConnectivityManager cm = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+                NetworkInfo info = cm.getActiveNetworkInfo();
+                return info != null && info.isConnected() ? "other" : "none";
+            } catch (Exception e) { return "unknown"; }
+        }
+
+        @JavascriptInterface
+        public void applyWifiUpdate(final String cb) { update(cb, true); }
+
 
         /** 当前生效资源版本，供 JS 显示在家长中心 */
         @JavascriptInterface
@@ -153,12 +195,16 @@ public class MainActivity extends Activity {
 
         /** 异步执行更新：下载 wgt → 解压 → 替换 www */
         @JavascriptInterface
-        public void applyUpdate(final String cb) {
+        public void applyUpdate(final String cb) { update(cb, false); }
+
+        private void update(final String cb, final boolean wifiOnly) {
             new Thread(new Runnable() {
                 public void run() {
                     File tmp = new File(getFilesDir(), "update_tmp");
                     try {
-                        JSONObject remote = fetchVersionJson();
+                        Network wifi = wifiOnly ? wifiNetwork() : null;
+                        if (wifiOnly && wifi == null) { waitingWifi(cb); return; }
+                        JSONObject remote = fetchVersionJson(wifi);
                         if (remote == null) {
                             cbError(cb, "网络不通，稍后再试");
                             return;
@@ -168,7 +214,7 @@ public class MainActivity extends Activity {
                         tmp.mkdirs();
 
                         URL u = new URL(base + remote.optString("wgt") + "?t=" + System.currentTimeMillis());
-                        HttpURLConnection c = (HttpURLConnection) u.openConnection();
+                        HttpURLConnection c = (HttpURLConnection) (wifi == null ? u.openConnection() : wifi.openConnection(u));
                         c.setConnectTimeout(10000);
                         c.setReadTimeout(30000);
                         if (c.getResponseCode() != 200) {
@@ -182,6 +228,7 @@ public class MainActivity extends Activity {
                         ZipEntry entry;
                         while ((entry = z.getNextEntry()) != null) {
                             File out = new File(tmp, entry.getName());
+                            if (!out.getCanonicalPath().startsWith(tmp.getCanonicalPath() + File.separator)) throw new Exception("更新包路径无效");
                             if (entry.isDirectory()) {
                                 out.mkdirs();
                                 continue;
@@ -190,6 +237,7 @@ public class MainActivity extends Activity {
                             FileOutputStream fo = new FileOutputStream(out);
                             int n;
                             while ((n = z.read(buf)) > 0) {
+                                if (wifiOnly && !wifi.equals(wifiNetwork())) { fo.close(); z.close(); c.disconnect(); deleteRecursive(tmp); waitingWifi(cb); return; }
                                 fo.write(buf, 0, n);
                                 done += n;
                             }
@@ -230,10 +278,16 @@ public class MainActivity extends Activity {
                         jsCallback(cb, ok);
                     } catch (Exception ex) {
                         deleteRecursive(tmp);
-                        cbError(cb, String.valueOf(ex));
+                        if (wifiOnly && wifiNetwork() == null) waitingWifi(cb);
+                        else cbError(cb, String.valueOf(ex));
                     }
                 }
             }).start();
+        }
+
+        private void waitingWifi(String cb) {
+            try { JSONObject o = new JSONObject(); o.put("state", "waitingwifi"); jsCallback(cb, o); }
+            catch (Exception ignored) { }
         }
 
         private void cbError(String cb, String msg) {
@@ -278,11 +332,13 @@ public class MainActivity extends Activity {
     }
 
     /** 依次尝试各 CDN 拉取 version.json，成功时把命中的源写进 _base 字段 */
-    private JSONObject fetchVersionJson() throws Exception {
+    private JSONObject fetchVersionJson() throws Exception { return fetchVersionJson(null); }
+
+    private JSONObject fetchVersionJson(Network wifi) throws Exception {
         for (String base : CDNS) {
             try {
                 URL u = new URL(base + "version.json?t=" + System.currentTimeMillis());
-                HttpURLConnection c = (HttpURLConnection) u.openConnection();
+                HttpURLConnection c = (HttpURLConnection) (wifi == null ? u.openConnection() : wifi.openConnection(u));
                 c.setConnectTimeout(8000);
                 c.setReadTimeout(8000);
                 if (c.getResponseCode() == 200) {

@@ -36,6 +36,7 @@ window.AppUpdate = (function () {
       try {
         var xhr = new XMLHttpRequest();
         xhr.timeout = timeoutMs || 8000;
+        xhr.ontimeout = function () { reject(new Error('检查更新超时')); };
         xhr.onload = function () {
           if (xhr.status === 200) { try { resolve(JSON.parse(xhr.responseText)); } catch (e) { reject(e); } }
           else reject(new Error('HTTP ' + xhr.status));
@@ -74,7 +75,7 @@ window.AppUpdate = (function () {
       var cur = parseInt(plus.runtime.versionCode, 10) || 0;
       var next = parseInt(info.versionCode, 10) || 0;
       if (next <= cur) {
-        if (!silent) cb({ state: 'uptodate', version: info.versionName });
+        cb({ state: 'uptodate', version: info.versionName });
         return;
       }
       cb({ state: 'found', version: info.versionName, notes: info.notes || '', go: function () {
@@ -89,34 +90,98 @@ window.AppUpdate = (function () {
           .catch(function (e) { cb({ state: 'error', msg: (e && e.message) || '下载出错' }); });
       } });
     }).catch(function (e) {
-      if (!silent) cb({ state: 'error', msg: e.message });
+      cb({ state: 'error', msg: e.message });
     });
   }
 
   /* ---------- 原生安卓外壳环境（Java 负责网络与解压） ---------- */
   function checkNative(silent, cb) {
-    window.__updCb = function (st) {
+    var nativeCb = function (st) {
       if (st.state === 'uptodate') { cb({ state: 'uptodate', version: st.version }); }
       else if (st.state === 'found') {
         cb({
           state: 'found', version: st.version, notes: st.notes || '',
-          go: function () { window.AndroidBridge.applyUpdate('__updCb'); }
+          go: function (wifiOnly) { window.__updCb = nativeCb; if (wifiOnly) window.AndroidBridge.applyWifiUpdate('__updCb'); else window.AndroidBridge.applyUpdate('__updCb'); }
         });
       } else if (st.state === 'downloading') { cb({ state: 'downloading', progress: st.progress }); }
       else if (st.state === 'done') { cb({ state: 'installed', version: st.version }); }
+      else if (st.state === 'waitingwifi') { cb({ state: 'waitingwifi' }); }
       else if (st.state === 'error') { cb({ state: 'error', msg: st.msg }); }
     };
+    window.__updCb = nativeCb;
     window.AndroidBridge.startCheck('__updCb');
   }
 
+  var busy = false, waiting = null, lastFoundGo = null, lastFoundVersion = '', autoCb = null, autoTimer = null, lastAutoCheck = 0, retryAfter = 0;
+  function network() {
+    try {
+      if (env() === 'native' && window.AndroidBridge.networkType) return window.AndroidBridge.networkType();
+      if (env() === 'hbuilder' && plus.networkinfo) return plus.networkinfo.getCurrentType() === plus.networkinfo.CONNECTION_WIFI ? 'wifi' : 'other';
+    } catch (e) { }
+    return 'unknown';
+  }
+  function canAuto() {
+    // 旧外壳无法把下载绑定到 Wi-Fi，必须先覆盖安装新 APK。
+    return env() === 'native' && !!window.AndroidBridge.applyWifiUpdate && network() === 'wifi';
+  }
+  function tickAuto() {
+    if (!autoCb || busy || (window.document && window.document.hidden) || Date.now() < retryAfter) return;
+    if (waiting && canAuto()) { waiting(true); return; }
+    if (Date.now() - lastAutoCheck >= 300000 && network() === 'wifi') check(true, autoCb);
+  }
+  function startAuto(cb) {
+    autoCb = cb;
+    if (autoTimer) return;
+    check(true, cb);
+    autoTimer = window.setInterval(tickAuto, 5000);
+    window.addEventListener('online', tickAuto);
+    if (window.document) window.document.addEventListener('visibilitychange', tickAuto);
+  }
   /* silent=true: 启动时自动检查，只在新版本时提示；false: 家长中心手动检查，给完整反馈 */
   function check(silent, uiCb) {
     var cb = uiCb || function () { };
     var m = env();
-    if (m === 'native') return checkNative(silent, cb);
-    if (m === 'hbuilder') return checkPlus(silent, cb);
-    if (!silent) cb({ state: 'nopreview' });
+    if (m === 'preview') { if (!silent) cb({ state: 'nopreview' }); return; }
+    if (busy) { if (!silent) cb({ state: 'busy' }); return; }
+    busy = true; lastAutoCheck = Date.now();
+    function notify(st) {
+      if (st.state !== 'downloading') busy = false;
+      if (st.state === 'downloading') st.progress = Math.max(0, Math.min(1, Number(st.progress) || 0));
+      if (st.state === 'found') {
+        var go = st.go;
+        st.go = function (wifiOnly) {
+          if (busy) { cb({ state: 'busy' }); return; }
+          busy = true;
+          cb({ state: 'downloading', progress: 0 });
+          waiting = null;
+          try { go(wifiOnly === true); } catch (e) { notify({ state: 'error', msg: e.message || '启动更新失败' }); }
+        };
+      }
+      if (st.state === 'found') {
+        waiting = lastFoundGo = st.go; lastFoundVersion = st.version;
+        if (canAuto()) { waiting(true); return; }
+        st.state = 'waitingwifi';
+        st.msg = env() === 'native' && !window.AndroidBridge.applyWifiUpdate ? '当前安装包需覆盖安装新版 APK，才能启用 Wi-Fi 自动更新。也可手动更新资源。' : '等待连接 Wi-Fi 后自动更新；现在也可手动使用移动网络更新。';
+      } else if (st.state === 'waitingwifi') {
+        // 下载期间 Wi-Fi 断开；重连后重新检查、下载，不转用移动网络。
+        waiting = lastFoundGo; st.go = lastFoundGo; st.version = lastFoundVersion;
+        st.msg = 'Wi-Fi 已断开，等待重连后自动更新；也可手动使用移动网络更新。';
+        retryAfter = Date.now() + 10000; lastAutoCheck = 0;
+      } else if (st.state === 'error') {
+        waiting = null; retryAfter = Date.now() + 60000; lastAutoCheck = 0;
+      } else if (st.state === 'installed' || st.state === 'uptodate') waiting = null;
+      cb(st);
+    }
+    cb({ state: 'checking' });
+    try {
+      if (m === 'native') return checkNative(silent, notify);
+      return checkPlus(silent, notify);
+    } catch (e) { notify({ state: 'error', msg: e.message || '检查更新失败' }); }
   }
 
-  return { check: check, env: env, version: version };
+  function restart() {
+    if (env() === 'hbuilder') plus.runtime.restart();
+    else window.location.reload();
+  }
+  return { check: check, startAuto: startAuto, network: network, env: env, version: version, restart: restart };
 })();

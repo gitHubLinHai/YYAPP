@@ -11,7 +11,7 @@
 
 发版流程: 生成wgt → git add release manifest.json → git push → 手机上等1分钟或点"检查更新"
 """
-import json, os, sys, zipfile
+import argparse, json, os, zipfile
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MANIFEST = os.path.join(BASE, 'manifest.json')
@@ -20,7 +20,11 @@ OUT = os.path.join(BASE, 'release')
 INCLUDE = ['index.html', 'manifest.json']
 DIRS = ['css', 'js', 'data', 'audio']
 
-bump = '--no-bump' not in sys.argv
+parser = argparse.ArgumentParser(description='生成 App 热更新资源包')
+parser.add_argument('--no-bump', action='store_true', help='使用当前版本重新打包')
+parser.add_argument('--notes', default='词库与游戏资源更新', help='手机更新提示中的版本说明')
+args = parser.parse_args()
+bump = not args.no_bump
 
 man = json.load(open(MANIFEST, encoding='utf-8'))
 if bump:
@@ -51,7 +55,7 @@ info = {
     'versionName': man['versionName'],
     'versionCode': man['versionCode'],
     'wgt': wgt_name,
-    'notes': '词库与游戏资源更新',
+    'notes': args.notes,
 }
 with open(os.path.join(OUT, 'version.json'), 'w', encoding='utf-8') as f:
     json.dump(info, f, ensure_ascii=False, indent=2)

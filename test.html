@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-<head><meta charset="UTF-8"><title>err-test</title></head>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>App 错误检查</title><link rel="stylesheet" href="css/style.css"><link rel="stylesheet" href="css/learning.css"><link rel="stylesheet" href="css/care.css"></head>
 <body>
+<div id="app"></div><div id="toast" class="toast hidden"></div><div id="confetti" class="confetti-layer"></div>
 <script>
   window._errs = [];
   window.onerror = function (m, s, l, c) { window._errs.push(m + ' @' + (s || '').split('/').pop() + ':' + l + ':' + c); return false; };
@@ -10,6 +11,10 @@
 <script src="data/grade2.js"></script>
 <script src="data/grade3.js"></script>
 <script src="data/phonics.js"></script>
+<script src="data/vocabulary.js"></script>
+<script src="js/update.js"></script>
+<script src="js/learning.js"></script>
+<script src="js/care.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

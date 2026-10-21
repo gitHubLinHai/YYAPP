@@ -46,6 +46,11 @@ def collect():
                 words[w] = True
     for w in EXTRA_WORDS:
         words[w] = True
+    # 独立积累词库使用紧凑的“英文|释义|建议年级”数据，不属于课程单元。
+    vocab = open(os.path.join(DATA, 'vocabulary.js'), encoding='utf-8').read()
+    for block in re.findall(r'var (?:rows|extra) = `([^`]+)`', vocab):
+        for row in block.splitlines():
+            words[row.split('|')[0]] = True
     return sorted(words), sorted(sents)
 
 
@@ -56,13 +61,18 @@ async def gen_one(sem, text, voice, rate, path):
         import edge_tts
         for attempt in range(3):
             try:
-                tts = edge_tts.Communicate(text, voice, rate=rate)
-                await tts.save(path)
+                tts = edge_tts.Communicate(text, voice, rate=rate, proxy=os.environ.get('EDGE_TTS_PROXY'))
+                await tts.save(path + '.part')
+                if os.path.getsize(path + '.part') <= 500:
+                    raise ValueError('生成的音频为空或不完整')
+                os.replace(path + '.part', path)
                 return 1
             except Exception as e:
                 if attempt == 2:
-                    print('FAIL %s: %s' % (path, e))
-                    return 0
+                    if os.path.exists(path + '.part'):
+                        os.remove(path + '.part')
+                    print('FAIL %s: %s' % (path, type(e).__name__))
+                    return -1
                 await asyncio.sleep(1.5)
 
 
@@ -82,19 +92,29 @@ async def main():
     out_s = os.path.join(BASE, 'audio', 'sent'); os.makedirs(out_s, exist_ok=True)
     out_l = os.path.join(BASE, 'audio', 'letters'); os.makedirs(out_l, exist_ok=True)
 
+    seen = set()
     for w in words:
-        tasks.append(gen_one(sem, w, VOICE_WORD, RATE_WORD, os.path.join(out_w, slug(w) + '.mp3')))
+        if slug(w) in seen:
+            continue
+        seen.add(slug(w))
+        spoken = {'a/an': 'a, an', 'PE': 'P E', 'TV': 'T V'}.get(w, w)
+        tasks.append(gen_one(sem, spoken, VOICE_WORD, RATE_WORD, os.path.join(out_w, slug(w) + '.mp3')))
     for s in sents:
         tasks.append(gen_one(sem, s, VOICE_SENT, RATE_SENT, os.path.join(out_s, slug(s) + '.mp3')))
     for l in letters:
         tasks.append(gen_one(sem, l, VOICE_WORD, '+0%', os.path.join(out_l, l.lower() + '.mp3')))
 
     print('共 %d 个音频任务(单词%d 例句%d 字母26)...' % (len(tasks), len(words), len(sents)))
-    done = 0
+    done, failed = 0, 0
     for i, r in enumerate(asyncio.as_completed(tasks)):
-        await r; done += 1
+        if await r < 0:
+            failed += 1
+        done += 1
         if done % 50 == 0:
             print('进度 %d/%d' % (done, len(tasks)))
+    if failed:
+        print('音频未全部完成：%d 个失败，请重试。' % failed)
+        sys.exit(1)
     print('完成！输出目录:', os.path.join(BASE, 'audio'))
 
 if __name__ == '__main__':
