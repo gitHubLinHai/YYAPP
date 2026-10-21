@@ -76,7 +76,7 @@ public class MainActivity extends Activity {
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         if (keyCode == KeyEvent.KEYCODE_BACK) {
-            onBackPressed();
+            if (event.getRepeatCount() == 0) onBackPressed();
             return true;
         }
         return super.onKeyDown(keyCode, event);
@@ -144,6 +144,14 @@ public class MainActivity extends Activity {
     }
 
     private class Bridge {
+        /** 网页完成首页二次返回确认并保存进度后关闭应用。 */
+        @JavascriptInterface
+        public void exitApp() {
+            runOnUiThread(new Runnable() {
+                public void run() { MainActivity.this.finishAndRemoveTask(); }
+            });
+        }
+
         @JavascriptInterface
         public String networkType() {
             try {

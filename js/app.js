@@ -952,7 +952,7 @@
   }
 
   /* ================= 页面历史与横向手势 ================= */
-  var navigation = { entries: [], index: -1, replaying: false, moving: false, token: Date.now() };
+  var navigation = { entries: [], index: -1, replaying: false, moving: false, exitAt: 0, token: Date.now() };
   function navigationBlocked() { return !!$('#careOverlay') || !!$('#updateOverlay'); }
   function capturePage() {
     var entry = navigation.entries[navigation.index];
@@ -984,16 +984,27 @@
   function goPage(delta) {
     if (navigation.moving || navigationBlocked()) return false;
     var next = navigation.index + delta;
-    if (next < 0 || next >= navigation.entries.length) { toast(delta < 0 ? '已经是第一页' : '没有可前进的页面'); return false; }
-    navigation.moving = true; window.history.go(delta); return true;
+    if (next < 0) {
+      var now = Date.now();
+      if (navigation.exitAt && now - navigation.exitAt < 3000) {
+        navigation.exitAt = 0; syncCare(); persist();
+        if (window.AndroidBridge && window.AndroidBridge.exitApp) window.AndroidBridge.exitApp();
+        else toast(window.AndroidBridge ? '请覆盖安装新版 APK，以启用返回退出' : '网页预览不退出，请关闭浏览器标签页');
+      } else { navigation.exitAt = now; toast('已经是第一页，再返回一次退出'); }
+      return false;
+    }
+    if (next >= navigation.entries.length) { toast('没有可前进的页面'); return false; }
+    navigation.exitAt = 0; navigation.moving = true; window.history.go(delta); return true;
   }
   function trackPage(name, render, cached) {
     return function () {
-      var args = Array.prototype.slice.call(arguments), key = name + (cached || name === 'result' ? '' : JSON.stringify(args));
+      var args = Array.prototype.slice.call(arguments);
+      if (args[0] instanceof Event) args = [];
+      var key = name + (cached || name === 'result' ? '' : JSON.stringify(args));
       if (navigation.replaying) return render.apply(null, args);
       var current = navigation.entries[navigation.index];
       if (navigation.index > 0 && navigation.entries[navigation.index - 1].key === key && name !== 'result') { goPage(-1); return; }
-      capturePage(); stopPage();
+      navigation.exitAt = 0; capturePage(); stopPage();
       var entry = { name: name, key: key, cached: cached, render: function () { render.apply(null, args); } };
       navigation.replaying = true; entry.render(); navigation.replaying = false;
       var replace = current && (current.key === key || (name === 'result' && current.name === 'quiz'));
@@ -1004,19 +1015,21 @@
     };
   }
   function resetNavigation() {
-    navigation.entries = []; navigation.index = -1; navigation.token = Date.now() + Math.random();
+    navigation.entries = []; navigation.index = -1; navigation.exitAt = 0; navigation.token = Date.now() + Math.random();
     window.history.replaceState({ eqPage: -1, token: navigation.token }, '');
   }
   function initNavigation() {
     window.history.replaceState({ eqPage: -1, token: navigation.token }, '');
+    document.addEventListener('visibilitychange', function () { navigation.exitAt = 0; });
     window.AppNav = { back: function () { return goPage(-1); }, forward: function () { return goPage(1); } };
     window.addEventListener('popstate', function (event) {
       var state = event.state;
       if (state && state.token === navigation.token && state.eqPage === navigation.index) { navigation.moving = false; return; }
+      if (state && state.token === navigation.token && state.eqPage < 0 && !navigationBlocked()) goPage(-1);
       if (!state || state.token !== navigation.token || state.eqPage < 0 || navigationBlocked()) {
         navigation.moving = true; window.history.go(state && state.token === navigation.token && state.eqPage > navigation.index ? -1 : 1); return;
       }
-      capturePage(); navigation.index = state.eqPage;
+      navigation.exitAt = 0; capturePage(); navigation.index = state.eqPage;
       restorePage(navigation.entries[navigation.index]); navigation.moving = false;
     });
     showHome = trackPage('home', showHome);
