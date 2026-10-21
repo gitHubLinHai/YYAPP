@@ -24,8 +24,6 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
 
 /**
  * 英语拼读闯关 - WebView 外壳
@@ -215,6 +213,7 @@ public class MainActivity extends Activity {
             new Thread(new Runnable() {
                 public void run() {
                     File tmp = new File(getFilesDir(), "update_tmp");
+                    File archive = new File(getFilesDir(), "update.wgt");
                     try {
                         Network wifi = wifiOnly ? wifiNetwork() : null;
                         if (wifiOnly && wifi == null) { waitingWifi(cb); return; }
@@ -223,6 +222,13 @@ public class MainActivity extends Activity {
                             cbError(cb, "网络不通，稍后再试");
                             return;
                         }
+                        if (remote.optInt("versionCode") <= activeCode()) {
+                            JSONObject current = new JSONObject(); current.put("state", "uptodate");
+                            current.put("version", activeName()); jsCallback(cb, current); return;
+                        }
+                        long expectedSize = remote.optLong("wgtSize", 0);
+                        String expectedHash = remote.optString("wgtSha256", "");
+                        if (expectedSize <= 0 || !expectedHash.matches("[a-fA-F0-9]{64}")) throw new Exception("更新信息缺少有效的完整性校验，请稍后重试");
                         String base = remote.optString("_base", CDNS[0]);
                         deleteRecursive(tmp);
                         tmp.mkdirs();
@@ -231,45 +237,30 @@ public class MainActivity extends Activity {
                         HttpURLConnection c = (HttpURLConnection) (wifi == null ? u.openConnection() : wifi.openConnection(u));
                         c.setConnectTimeout(10000);
                         c.setReadTimeout(30000);
-                        if (c.getResponseCode() != 200) {
-                            cbError(cb, "下载失败 HTTP " + c.getResponseCode());
-                            return;
-                        }
-                        long total = c.getContentLength();
-                        long done = 0, lastPost = 0;
-                        ZipInputStream z = new ZipInputStream(c.getInputStream());
-                        byte[] buf = new byte[16384];
-                        ZipEntry entry;
-                        while ((entry = z.getNextEntry()) != null) {
-                            File out = new File(tmp, entry.getName());
-                            if (!out.getCanonicalPath().startsWith(tmp.getCanonicalPath() + File.separator)) throw new Exception("更新包路径无效");
-                            if (entry.isDirectory()) {
-                                out.mkdirs();
-                                continue;
+                        try {
+                            if (c.getResponseCode() != 200) throw new java.io.IOException("下载失败 HTTP " + c.getResponseCode());
+                            long done = 0, lastPost = 0;
+                            try (InputStream input = c.getInputStream(); FileOutputStream output = new FileOutputStream(archive)) {
+                                byte[] buf = new byte[16384];
+                                int n;
+                                while ((n = input.read(buf)) != -1) {
+                                    if (wifiOnly && !wifi.equals(wifiNetwork())) throw new java.io.IOException("Wi-Fi 已断开");
+                                    done += n;
+                                    if (done > expectedSize) throw new java.io.IOException("更新包大小超出预期，旧版已保留");
+                                    output.write(buf, 0, n);
+                                    if (System.currentTimeMillis() - lastPost > 300) {
+                                        lastPost = System.currentTimeMillis();
+                                        JSONObject p = new JSONObject(); p.put("state", "downloading");
+                                        p.put("progress", (double) done / expectedSize); jsCallback(cb, p);
+                                    }
+                                }
                             }
-                            out.getParentFile().mkdirs();
-                            FileOutputStream fo = new FileOutputStream(out);
-                            int n;
-                            while ((n = z.read(buf)) > 0) {
-                                if (wifiOnly && !wifi.equals(wifiNetwork())) { fo.close(); z.close(); c.disconnect(); deleteRecursive(tmp); waitingWifi(cb); return; }
-                                fo.write(buf, 0, n);
-                                done += n;
-                            }
-                            fo.close();
-                            if (total > 0 && System.currentTimeMillis() - lastPost > 300) {
-                                lastPost = System.currentTimeMillis();
-                                JSONObject p = new JSONObject();
-                                p.put("state", "downloading");
-                                p.put("progress", (double) done / (double) total);
-                                jsCallback(cb, p);
-                            }
-                        }
-                        z.close();
-
-                        if (!new File(tmp, "index.html").exists()) {
-                            cbError(cb, "更新包内容不完整");
-                            return;
-                        }
+                        } finally { c.disconnect(); }
+                        UpdatePackage.verifyAndExtract(archive, tmp, expectedSize, expectedHash);
+                        JSONObject packaged = new JSONObject(readLocal(new File(tmp, "manifest.json")));
+                        if (packaged.optInt("versionCode") != remote.optInt("versionCode")
+                                || !packaged.optString("versionName").equals(remote.optString("versionName")))
+                            throw new Exception("更新包版本与更新信息不一致，旧版已保留");
                         File old = new File(getFilesDir(), "www_old");
                         deleteRecursive(old);
                         if (!wwwDir.renameTo(old)) {
@@ -291,9 +282,10 @@ public class MainActivity extends Activity {
                         ok.put("version", remote.optString("versionName"));
                         jsCallback(cb, ok);
                     } catch (Exception ex) {
-                        deleteRecursive(tmp);
                         if (wifiOnly && wifiNetwork() == null) waitingWifi(cb);
                         else cbError(cb, String.valueOf(ex));
+                    } finally {
+                        deleteRecursive(archive); deleteRecursive(tmp);
                     }
                 }
             }).start();

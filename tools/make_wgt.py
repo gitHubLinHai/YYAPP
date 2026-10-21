@@ -11,7 +11,7 @@
 
 发版流程: 生成wgt → git add release manifest.json → git push → 手机上等1分钟或点"检查更新"
 """
-import argparse, json, os, zipfile
+import argparse, json, os, zipfile, hashlib
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MANIFEST = os.path.join(BASE, 'manifest.json')
@@ -51,10 +51,15 @@ with zipfile.ZipFile(wgt_path, 'w', zipfile.ZIP_DEFLATED, compresslevel=6) as z:
                 p = os.path.join(root, fn)
                 z.write(p, os.path.relpath(p, BASE))
 
+with open(wgt_path, 'rb') as package:
+    wgt_hash = hashlib.sha256(package.read()).hexdigest()
+
 info = {
     'versionName': man['versionName'],
     'versionCode': man['versionCode'],
     'wgt': wgt_name,
+    'wgtSize': os.path.getsize(wgt_path),
+    'wgtSha256': wgt_hash,
     'notes': args.notes,
 }
 with open(os.path.join(OUT, 'version.json'), 'w', encoding='utf-8') as f:
