@@ -24,6 +24,13 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 英语拼读闯关 - WebView 外壳
@@ -33,7 +40,7 @@ import java.net.URL;
  */
 public class MainActivity extends Activity {
 
-    /** 与 js/update.js 保持一致的三源列表（fastly 在国内可直连，放最前） */
+    /** 与 js/update.js 保持一致的三源列表（并行检查，选取最高有效版本） */
     private static final String[] CDNS = {
             "https://fastly.jsdelivr.net/gh/gitHubLinHai/YYAPP@main/release/",
             "https://cdn.jsdelivr.net/gh/gitHubLinHai/YYAPP@main/release/",
@@ -190,12 +197,16 @@ public class MainActivity extends Activity {
                         }
                         int next = remote.optInt("versionCode", 0);
                         JSONObject o = new JSONObject();
-                        if (next <= activeCode()) {
+                        if (next < activeCode()) {
+                            cbError(cb, "更新源版本落后于当前 v" + activeName() + "，暂时无法确认更新，请稍后重试");
+                            return;
+                        }
+                        if (next == activeCode()) {
                             o.put("state", "uptodate");
                         } else {
                             o.put("state", "found");
                         }
-                        o.put("version", remote.optString("versionName"));
+                        o.put("version", next == activeCode() ? activeName() : remote.optString("versionName"));
                         o.put("notes", remote.optString("notes"));
                         jsCallback(cb, o);
                     } catch (Exception e) {
@@ -222,7 +233,11 @@ public class MainActivity extends Activity {
                             cbError(cb, "网络不通，稍后再试");
                             return;
                         }
-                        if (remote.optInt("versionCode") <= activeCode()) {
+                        if (remote.optInt("versionCode") < activeCode()) {
+                            cbError(cb, "更新源版本落后于当前 v" + activeName() + "，暂时无法确认更新，请稍后重试");
+                            return;
+                        }
+                        if (remote.optInt("versionCode") == activeCode()) {
                             JSONObject current = new JSONObject(); current.put("state", "uptodate");
                             current.put("version", activeName()); jsCallback(cb, current); return;
                         }
@@ -337,31 +352,55 @@ public class MainActivity extends Activity {
         return new String(bo.toByteArray(), "UTF-8");
     }
 
-    /** 依次尝试各 CDN 拉取 version.json，成功时把命中的源写进 _base 字段 */
+    /** 并行读取各源，缓存旧版本不能遮住其他源的新版本。 */
     private JSONObject fetchVersionJson() throws Exception { return fetchVersionJson(null); }
 
-    private JSONObject fetchVersionJson(Network wifi) throws Exception {
-        for (String base : CDNS) {
-            try {
-                URL u = new URL(base + "version.json?t=" + System.currentTimeMillis());
-                HttpURLConnection c = (HttpURLConnection) (wifi == null ? u.openConnection() : wifi.openConnection(u));
-                c.setConnectTimeout(8000);
-                c.setReadTimeout(8000);
-                if (c.getResponseCode() == 200) {
-                    InputStream in = c.getInputStream();
-                    ByteArrayOutputStream bo = new ByteArrayOutputStream();
-                    byte[] b = new byte[4096];
-                    int n;
-                    while ((n = in.read(b)) > 0) bo.write(b, 0, n);
-                    in.close();
-                    JSONObject o = new JSONObject(new String(bo.toByteArray(), "UTF-8"));
-                    o.put("_base", base);
-                    return o;
+    private JSONObject fetchVersionJson(final Network wifi) throws Exception {
+        ExecutorService pool = Executors.newFixedThreadPool(CDNS.length);
+        List<Callable<JSONObject>> tasks = new ArrayList<>();
+        for (final String base : CDNS) {
+            tasks.add(new Callable<JSONObject>() {
+                public JSONObject call() throws Exception {
+                    URL u = new URL(base + "version.json?t=" + System.currentTimeMillis());
+                    HttpURLConnection c = (HttpURLConnection) (wifi == null ? u.openConnection() : wifi.openConnection(u));
+                    c.setConnectTimeout(4000);
+                    c.setReadTimeout(4000);
+                    c.setUseCaches(false);
+                    try {
+                        if (c.getResponseCode() != 200) return null;
+                        ByteArrayOutputStream bo = new ByteArrayOutputStream();
+                        try (InputStream in = c.getInputStream()) {
+                            byte[] b = new byte[4096];
+                            int n;
+                            while ((n = in.read(b)) != -1) {
+                                if (bo.size() + n > 65536) return null;
+                                bo.write(b, 0, n);
+                            }
+                        }
+                        JSONObject o = new JSONObject(new String(bo.toByteArray(), "UTF-8"));
+                        if (o.optInt("versionCode", 0) <= 0 || o.optString("versionName").trim().isEmpty()
+                                || !o.optString("wgt").matches("[A-Za-z0-9._-]+\\.wgt")) return null;
+                        // 新版本只有具备完整校验信息才可作为可安装候选。
+                        if (o.optInt("versionCode") > activeCode() && (o.optLong("wgtSize", 0) <= 0
+                                || !o.optString("wgtSha256").matches("[a-fA-F0-9]{64}"))) return null;
+                        o.put("_base", base);
+                        return o;
+                    } finally { c.disconnect(); }
                 }
-            } catch (Exception ignored) {
-            }
+            });
         }
-        return null;
+        try {
+            JSONObject best = null;
+            for (Future<JSONObject> result : pool.invokeAll(tasks, 9, TimeUnit.SECONDS)) {
+                if (result.isCancelled()) continue;
+                try {
+                    JSONObject candidate = result.get();
+                    if (candidate != null && (best == null || candidate.optInt("versionCode") > best.optInt("versionCode")))
+                        best = candidate;
+                } catch (Exception ignored) { }
+            }
+            return best;
+        } finally { pool.shutdownNow(); }
     }
 
     private void deleteRecursive(File f) {

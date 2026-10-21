@@ -41,6 +41,12 @@ function native(type) {
   update.check(false, st => states.push(st));
   assert.equal(states.at(-1).state, 'checking', '失败后允许重试');
 
+  const stale = native(), staleStates = [];
+  stale.update.check(false, st => staleStates.push(st));
+  stale.window.__updCb({ state: 'uptodate', version: '1.0.1' });
+  assert.equal(staleStates.at(-1).state, 'error', '旧外壳旧源不能误报最新');
+  assert.match(staleStates.at(-1).msg, /1\.0\.2/);
+
   const wifi = native('wifi'), wifiStates = [];
   wifi.update.startAuto(st => wifiStates.push(st));
   wifi.window.__updCb({ state: 'found', version: '1.0.4' });
@@ -95,5 +101,41 @@ function native(type) {
   assert.equal(attempts, 3, '超时后尝试后续更新源');
   await new Promise(resolve => h5.AppUpdate.check(false, st => { if (st.state === 'error') resolve(st); }));
   assert.equal(attempts, 6, '静默检查失败后不会永久占用更新锁');
+  async function checkSources(versions) {
+    let started = 0, downloadUrl = '';
+    const runtime = { version: '1.0.5', versionCode: '105' };
+    const plus = { runtime, downloader: { createDownload(url) {
+      downloadUrl = url; return { start() {}, addEventListener() {} };
+    } } };
+    function XHR() {
+      this.open = url => { this.url = url; };
+      this.send = () => {
+        const index = started++;
+        queueMicrotask(() => {
+          assert.equal(started, 3, '必须同时检查所有源');
+          const code = versions[index];
+          if (code === null) return this.ontimeout();
+          this.status = 200;
+          this.responseText = JSON.stringify({ versionCode: code, versionName: '1.0.' + (code - 100), wgt: 'test.wgt' });
+          this.onload();
+        });
+      };
+    }
+    const window = { plus };
+    vm.runInNewContext(source, { window, plus, XMLHttpRequest: XHR });
+    const state = await new Promise(resolve => window.AppUpdate.check(false, st => { if (st.state !== 'checking') resolve(st); }));
+    return { state, start() { state.go(); return downloadUrl; } };
+  }
+  const mixed = await checkSources([103, 108, 107]);
+  assert.equal(mixed.state.version, '1.0.8', '主源旧缓存不能遮住备用源新版本');
+  assert.match(mixed.start(), /^https:\/\/cdn\.jsdelivr\.net\//, '从最高版本对应源下载');
+  assert.equal((await checkSources([103, null, 108])).state.version, '1.0.8');
+  assert.equal((await checkSources([999.5, 108, null])).state.version, '1.0.8', '非法版本不得参与选择');
+  const oldSources = (await checkSources([103, 104, null])).state;
+  assert.equal(oldSources.state, 'error');
+  assert.match(oldSources.msg, /版本落后/);
+  const same = (await checkSources([103, 105, null])).state;
+  assert.equal(same.state, 'uptodate');
+  assert.equal(same.version, '1.0.5');
   console.log('更新逻辑通过：并发保护、旧按钮回调、重复下载、进度限制、安卓重载、Wi-Fi 自动下载及断网恢复、移动网络等待和手动下载、旧外壳兼容、失败重试与 H5 超时换源。');
 })().catch(e => { console.error(e); process.exitCode = 1; });

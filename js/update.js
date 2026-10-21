@@ -5,7 +5,7 @@
    3. 浏览器预览    —— 都没有时静默跳过，不影响本地开发 */
 window.AppUpdate = (function () {
   'use strict';
-  // 更新文件托管在 GitHub 仓库 release/ 目录，经 jsDelivr CDN 分发（按顺序尝试）
+  // 更新文件托管在 GitHub 仓库 release/ 目录，经 jsDelivr CDN 分发（并行检查最高有效版本）
   // fastly 节点在国内可直连，放最前
   var CDNS = [
     'https://fastly.jsdelivr.net/gh/gitHubLinHai/YYAPP@main/release/',
@@ -48,14 +48,18 @@ window.AppUpdate = (function () {
     });
   }
   function getRemoteInfo() {
-    var i = 0;
-    function tryNext() {
-      if (i >= CDNS.length) return Promise.reject(new Error('所有更新源都连不上'));
-      return fetchJson(CDNS[i] + 'version.json')
-        .then(function (info) { return { info: info, base: CDNS[i] }; })
-        .catch(function () { i++; return tryNext(); });
-    }
-    return tryNext();
+    return Promise.all(CDNS.map(function (base) {
+      return fetchJson(base + 'version.json').then(function (info) {
+        if (!Number.isInteger(info.versionCode) || info.versionCode <= 0 || !info.versionName
+            || !/^[A-Za-z0-9._-]+\.wgt$/.test(info.wgt)) return null;
+        return { info: info, base: base };
+      }).catch(function () { return null; });
+    })).then(function (results) {
+      var best = null;
+      results.forEach(function (r) { if (r && (!best || r.info.versionCode > best.info.versionCode)) best = r; });
+      if (!best) throw new Error('所有更新源均不可用，请稍后重试');
+      return best;
+    });
   }
   function downloadWgt(url, onProgress) {
     return new Promise(function (resolve, reject) {
@@ -74,8 +78,9 @@ window.AppUpdate = (function () {
       var info = r.info;
       var cur = parseInt(plus.runtime.versionCode, 10) || 0;
       var next = parseInt(info.versionCode, 10) || 0;
-      if (next <= cur) {
-        cb({ state: 'uptodate', version: info.versionName });
+      if (next < cur) throw new Error('更新源版本落后于当前 v' + version() + '，暂时无法确认更新，请稍后重试');
+      if (next === cur) {
+        cb({ state: 'uptodate', version: version() });
         return;
       }
       cb({ state: 'found', version: info.versionName, notes: info.notes || '', go: function () {
@@ -97,7 +102,12 @@ window.AppUpdate = (function () {
   /* ---------- 原生安卓外壳环境（Java 负责网络与解压） ---------- */
   function checkNative(silent, cb) {
     var nativeCb = function (st) {
-      if (st.state === 'uptodate') { cb({ state: 'uptodate', version: st.version }); }
+      if (st.state === 'uptodate') {
+        // 兼容旧外壳：旧源回报更低版本时，不能显示为当前最新版本。
+        var current = version();
+        if (st.version !== current) cb({ state: 'error', msg: '更新源版本与当前 v' + current + ' 不一致，暂时无法确认更新；旧安装包请覆盖安装新版 APK。' });
+        else cb({ state: 'uptodate', version: current });
+      }
       else if (st.state === 'found') {
         cb({
           state: 'found', version: st.version, notes: st.notes || '',

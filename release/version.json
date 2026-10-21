@@ -1,8 +1,8 @@
 {
-  "versionName": "1.0.7",
-  "versionCode": 107,
-  "wgt": "EnglishQuest-v1.0.7.wgt",
-  "wgtSize": 8070018,
-  "wgtSha256": "cc0dda98cc6c3889681ccaa4213e792d3cff65e380ffdbca971182fe795ae128",
-  "notes": "同步外研新标准三起2024版三年级上册：Welcome与6个Unit、37组词汇练习、教材页码及单元目标；保留旧进度，无需重装APK"
+  "versionName": "1.0.8",
+  "versionCode": 108,
+  "wgt": "EnglishQuest-v1.0.8.wgt",
+  "wgtSize": 8070323,
+  "wgtSha256": "57f9a42f8664e611a37c92e9f3dd37c2c621c3e3d667ec37fd301a4d509a5482",
+  "notes": "修复更新源旧缓存导致1.0.5误报最新1.0.3；多源并行取最高有效版本；原生修复需覆盖安装1.0.8一次，保留学习进度"
 }

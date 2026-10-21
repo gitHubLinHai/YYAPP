@@ -342,7 +342,7 @@
   function renderUpdateState(box, st, startup) {
     if (st.state === 'checking') { box.textContent = '正在检查更新…'; }
     else if (st.state === 'busy') { toast('正在检查或下载更新，请稍候'); }
-    else if (st.state === 'uptodate') { box.textContent = '已是最新版本 v' + st.version; }
+    else if (st.state === 'uptodate') { box.textContent = '当前版本 v' + st.version + '，暂未发现更高版本'; }
     else if (st.state === 'nopreview') { box.textContent = '网页预览不支持，请在手机 App 里检查更新。'; }
     else if (st.state === 'error') {
       box.innerHTML = '<p class="helper" role="alert"></p><button class="btn ghost" id="closeUpdate">稍后重试</button>';
