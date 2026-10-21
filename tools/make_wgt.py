@@ -11,7 +11,7 @@
 
 发版流程: 生成wgt → git add release manifest.json → git push → 手机上等1分钟或点"检查更新"
 """
-import argparse, json, os, zipfile, hashlib
+import argparse, json, os, zipfile, hashlib, re
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MANIFEST = os.path.join(BASE, 'manifest.json')
@@ -25,6 +25,16 @@ parser.add_argument('--no-bump', action='store_true', help='使用当前版本�
 parser.add_argument('--notes', default='词库与游戏资源更新', help='手机更新提示中的版本说明')
 args = parser.parse_args()
 bump = not args.no_bump
+
+# 新教材等新增入口资源也必须实际存在，避免只打入首页但漏掉它引用的文件。
+with open(os.path.join(BASE, 'index.html'), encoding='utf-8') as source:
+    references = re.findall(r"(?:src|href)=[\"']([^\"']+)[\"']", source.read())
+for reference in references:
+    if re.match(r'^(?:[a-z]+:|//|#)', reference, re.I):
+        continue
+    required = os.path.join(BASE, reference.split('?')[0].split('#')[0])
+    if not os.path.isfile(required) or os.path.getsize(required) == 0:
+        raise SystemExit('首页引用的资源缺失或为空：' + reference)
 
 man = json.load(open(MANIFEST, encoding='utf-8'))
 if bump:

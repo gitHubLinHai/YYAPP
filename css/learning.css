@@ -173,3 +173,7 @@ select { display: block; width: 100%; padding: 14px; border: 1px solid #cfdbca; 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+
+.textbook-chapter { grid-column: 1 / -1; margin-top: 20px; }
+.textbook-chapter h3, .textbook-note h3 { overflow-wrap: anywhere; }
+.textbook-note small { display: block; line-height: 1.7; }

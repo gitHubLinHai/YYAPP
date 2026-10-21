@@ -85,14 +85,14 @@
     var envelope = JSON.parse(text); check(envelope.app === 'EnglishQuest' && envelope.format === 1 && object(envelope.data));
     var d = envelope.data; safeTree(d, 0);
     check(number(d.coins) && number(d.streak) && typeof d.last === 'string' && object(d.stars) && object(d.wrong) && object(d.phonics));
-    Object.keys(d.stars).forEach(function (key) { check(/^g[123]u\d+$/.test(key) && Number.isInteger(d.stars[key]) && d.stars[key] <= 3); });
+    Object.keys(d.stars).forEach(function (key) { check(/^(?:g[123]|nse3a24)u\d+$/.test(key) && Number.isInteger(d.stars[key]) && d.stars[key] <= 3); });
     Object.keys(d.wrong).forEach(function (key) { var w = d.wrong[key]; check(word(key) && object(w) && w.word === key && typeof w.zh === 'string'); });
     if (d.lessons !== undefined) {
       check(object(d.lessons));
-      Object.keys(d.lessons).forEach(function (key) { check(/^g[123]u\d+$/.test(key) && object(d.lessons[key])); Object.keys(d.lessons[key]).forEach(function (stage) { check(['learn', 'listen', 'spell', 'sentence', 'check'].indexOf(stage) >= 0 && typeof d.lessons[key][stage] === 'boolean'); }); });
+      Object.keys(d.lessons).forEach(function (key) { check(/^(?:g[123]|nse3a24)u\d+$/.test(key) && object(d.lessons[key])); Object.keys(d.lessons[key]).forEach(function (stage) { check(['learn', 'listen', 'spell', 'sentence', 'check'].indexOf(stage) >= 0 && typeof d.lessons[key][stage] === 'boolean'); }); });
     }
     if (d.review !== undefined) records(d.review);
-    if (d.course !== undefined) check(object(d.course) && ['g1', 'g2', 'g3'].indexOf(d.course.grade) >= 0 && Number.isInteger(d.course.unit) && d.course.unit >= 0);
+    if (d.course !== undefined) check(object(d.course) && ['g1', 'g2', 'g3', 'nse3a24'].indexOf(d.course.grade) >= 0 && Number.isInteger(d.course.unit) && d.course.unit >= 0);
     if (d.vocab !== undefined) {
       check(object(d.vocab) && [3, 4, 5, 6].indexOf(d.vocab.grade) >= 0 && typeof d.vocab.day === 'string' && Array.isArray(d.vocab.newToday) && d.vocab.newToday.length <= 5 && d.vocab.newToday.every(word));
       records(d.vocab.records);

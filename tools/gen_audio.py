@@ -33,7 +33,7 @@ def load_js(path):
 
 def collect():
     words, sents = {}, {}
-    for f in ('grade1.js', 'grade2.js', 'grade3.js'):
+    for f in ('grade1.js', 'grade2.js', 'grade3.js', 'textbook.js'):
         db = load_js(os.path.join(DATA, f))
         for u in db['units']:
             for w in u['words']:

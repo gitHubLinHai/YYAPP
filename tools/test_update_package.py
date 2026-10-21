@@ -7,6 +7,7 @@ import os
 import subprocess
 import tempfile
 import warnings
+import re
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -84,9 +85,19 @@ public class CheckPackage {
         (project / name).write_bytes((ROOT / name).read_bytes())
     for directory in ['css', 'js', 'data', 'audio']:
         (project / directory).mkdir()
+    for reference in re.findall(r"""(?:src|href)=["']([^"']+)["']""", (ROOT / 'index.html').read_text(encoding='utf-8')):
+        target = project / reference
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes((ROOT / reference).read_bytes())
     subprocess.run([os.sys.executable, str(project / 'tools/make_wgt.py'), '--no-bump'], check=True, capture_output=True)
     info = json.loads((project / 'release/version.json').read_text(encoding='utf-8'))
     data = (project / 'release' / info['wgt']).read_bytes()
     assert info['wgtSize'] == len(data)
     assert info['wgtSha256'] == hashlib.sha256(data).hexdigest()
+    (project / 'data/textbook.js').write_bytes(b'')
+    failed = subprocess.run([os.sys.executable, str(project / 'tools/make_wgt.py'), '--no-bump'], capture_output=True)
+    assert failed.returncode != 0, '入口引用的空资源必须阻止发布'
+    (project / 'data/textbook.js').unlink()
+    failed = subprocess.run([os.sys.executable, str(project / 'tools/make_wgt.py'), '--no-bump'], capture_output=True)
+    assert failed.returncode != 0, '入口引用的缺失资源必须阻止发布'
     print(f'更新包验证通过：{cases} 个 Java 用例，覆盖正常解包、缺文件、空文件、大小与哈希、CRC、截断、路径越界、重复条目和旧版保留；发布元数据一致。')

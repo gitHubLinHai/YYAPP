@@ -5,13 +5,15 @@
 
   var AUDIO_EXT = '.mp3';           // 打包内置音频后缀；若无内置音频会自动回退到系统TTS
   var app = document.getElementById('app');
+  var BOOK_ID = 'nse3a24', COURSE_IDS = [BOOK_ID, 'g1', 'g2', 'g3'];
   var QUIZ_LEN = 10;                // 每关题数
 
   /* ================= 进度存取 ================= */
   var KEY = 'eq_save_v1';
-  function newSave() { return { coins: 0, stars: {}, wrong: {}, streak: 0, last: '', phonics: {}, lessons: {}, review: {}, course: { grade: 'g1', unit: 0 }, vocab: { grade: 3, records: {}, day: '', newToday: [] }, history: [], care: Care.defaults() }; }
+  function newSave() { return { coins: 0, stars: {}, wrong: {}, streak: 0, last: '', phonics: {}, lessons: {}, review: {}, course: { grade: BOOK_ID, unit: 0 }, textbookVersion: BOOK_ID, vocab: { grade: 3, records: {}, day: '', newToday: [] }, history: [], care: Care.defaults() }; }
   var save = newSave();
   try { var raw = localStorage.getItem(KEY); if (raw) { var d = JSON.parse(raw); for (var k in save) if (d[k] !== undefined) save[k] = d[k]; } } catch (e) { }
+  if (!d || d.textbookVersion !== BOOK_ID) { save.course = { grade: BOOK_ID, unit: 0 }; save.textbookVersion = BOOK_ID; persist(); }
   function persist() { try { localStorage.setItem(KEY, JSON.stringify(save)); return true; } catch (e) { return false; } }
   function totalStars() { var s = 0; for (var k in save.stars) s += save.stars[k]; return s; }
   function pandaTitle() {
@@ -92,7 +94,7 @@
   }
   function wordEmoji(w) {
     var hit = null;
-    ['g1', 'g2', 'g3'].forEach(function (g) {
+    COURSE_IDS.forEach(function (g) {
       window.DB[g].units.forEach(function (u) {
         u.words.forEach(function (x) { if (!hit && x.w === w && x.emoji) hit = x.emoji; });
       });
@@ -104,6 +106,8 @@
     window.DB[gid].units.forEach(function (u) { u.words.forEach(function (w) { out.push(w); }); });
     return out;
   }
+  function allCourseWords() { return COURSE_IDS.reduce(function (out, gid) { return out.concat(allWords(gid)); }, []); }
+  function courseTitle(gid) { return gid === BOOK_ID ? '外研新标准 · 三年级上册' : '拓展主题 · ' + window.DB[gid].title; }
   function confetti() {
     var layer = $('#confetti'); layer.innerHTML = '';
     var colors = ['#ffb400', '#ff6b6b', '#6fd28c', '#58aaf5', '#c084fc', '#ff9214'];
@@ -128,13 +132,13 @@
     app.innerHTML = '<header class="brand"><a class="brand-name" href="#">🐼 熊猫英语<span>ENGLISH QUEST</span></a><button class="profile" id="parentBtn" aria-label="家长中心">家长中心 ↗</button></header>' +
       '<button class="eye-quick" id="eyeToggle" aria-pressed="' + Care.eyeOn(save.care) + '"><span>◉ 一键护眼</span><small>' + (Care.eyeOn(save.care) ? '已开启 · 点此关闭' : '暖纸 · 大字 · 定时休息') + '</small><b>' + (Care.eyeOn(save.care) ? '开' : '关') + '</b></button>' +
       '<div class="greeting"><span class="eyebrow">每天一点，慢慢走远</span><h1>今天，也进步一点点。</h1><p>听懂一个词，再用它说一句话。</p></div>' +
-      '<div class="course-strip"><div><span class="label">我的课程</span><strong>外研版新标准 · ' + g.title + '</strong><small>主题练习 · 教材起点与册次待核对</small></div><button class="text-btn" id="courseBtn">调整 ›</button></div>' +
-      '<section class="today-card"><div class="today-copy"><span class="pill">今日学习 · 建议 10–15 分钟</span><h2>' + u.title + '</h2><p>' + u.en + ' · ' + u.words.length + ' 个单词</p><button class="btn green" id="continueBtn">' + (done ? '继续学习' : '开始今天的学习') + ' <span>→</span></button></div><div class="book-art" aria-hidden="true"><span class="art-star">✦</span><div class="book-face">Aa<small>HELLO, WORLD</small></div><span class="art-leaf">🌱</span></div><div class="today-progress"><span>当前主题 · 已完成 ' + done + '/5 步</span><div class="thin-track"><i style="width:' + done * 20 + '%"></i></div></div></section>' +
-      '<div class="section-title"><h2>一步一步，学得扎实</h2><button class="text-btn" id="routeBtn">全部主题 ↗</button></div>' +
+      '<div class="course-strip"><div><span class="label">我的课程</span><strong>' + courseTitle(gid) + '</strong><small>' + (gid === BOOK_ID ? '三年级起点 · 2024新版 · 单元词汇同步' : '按主题编排的拓展练习') + '</small></div><button class="text-btn" id="courseBtn">调整 ›</button></div>' +
+      '<section class="today-card"><div class="today-copy"><span class="pill">今日学习 · 建议 10–15 分钟</span><h2>' + (gid === BOOK_ID ? g.chapters[u.chapter].title : u.title) + '</h2><p>' + (gid === BOOK_ID ? g.chapters[u.chapter].label + ' · 第' + u.group + '组' : u.en) + ' · ' + u.words.length + ' 个单词</p><button class="btn green" id="continueBtn">' + (done ? '继续学习' : '开始今天的学习') + ' <span>→</span></button></div><div class="book-art" aria-hidden="true"><span class="art-star">✦</span><div class="book-face">Aa<small>HELLO, WORLD</small></div><span class="art-leaf">🌱</span></div><div class="today-progress"><span>' + (gid === BOOK_ID ? '当前学习组' : '当前主题') + ' · 已完成 ' + done + '/5 步</span><div class="thin-track"><i style="width:' + done * 20 + '%"></i></div></div></section>' +
+      '<div class="section-title"><h2>一步一步，学得扎实</h2><button class="text-btn" id="routeBtn">' + (gid === BOOK_ID ? '课本目录 ↗' : '全部主题 ↗') + '</button></div>' +
       '<div class="mini-route">' + Learning.stages.map(function (st, i) { return '<div class="mini-step ' + (Learning.progress(save, gid, ui)[st.id] ? 'done' : '') + '"><span>' + (Learning.progress(save, gid, ui)[st.id] ? '✓' : '0' + (i + 1)) + '</span><b>' + ['认词', '听辨', '拼写', '用句', '检测'][i] + '</b></div>'; }).join('') + '</div>' +
       '<div class="section-title"><h2>把学过的，记得更久</h2></div><div class="practice-grid"><button class="practice-card" id="reviewBtn"><span class="practice-icon">↻</span><strong>到期复习 <em>' + due + '</em></strong><p>' + (due ? '先复习，再学新内容' : '学过的词会在这里等你') + '</p></button><button class="practice-card" id="phonicsBtn"><span class="practice-icon peach">Aa</span><strong>字母与发音</strong><p>听例词，认识声音与字母</p></button></div>' +
       '<button class="vocab-entry" id="vocabBtn"><span>🌱</span><span><strong>年级词汇积累</strong><small>三至六年级 · 独立词库 · 为后续学习打基础</small></span><b>→</b></button>' +
-      '<div class="week-note"><span>✦</span><p>已完成 <b>' + completed + '</b> 个主题检测 · 连续学习 <b>' + save.streak + '</b> 天<br><small>认真学完一小步，就值得被看见。</small></p><span class="note-stars">' + totalStars() + ' ★</span></div>' +
+      '<div class="week-note"><span>✦</span><p>已完成 <b>' + completed + '</b> 个' + (gid === BOOK_ID ? '学习组' : '主题') + '检测 · 连续学习 <b>' + save.streak + '</b> 天<br><small>认真学完一小步，就值得被看见。</small></p><span class="note-stars">' + totalStars() + ' ★</span></div>' +
       '<nav class="bottom-nav"><button class="active" id="homeNav">⌂<span>今日</span></button><button id="mapNav">☷<span>学习路线</span></button><button id="vocabNav">♧<span>词汇积累</span></button><button id="wrongNav">▤<span>错词本</span></button><button id="parentNav">♙<span>我的</span></button></nav>';
     $('#eyeToggle').onclick = function () { syncCare(); Care.toggleEye(save.care); applyReading(); persist(); showHome(); syncCare(); };
     $('#continueBtn').onclick = function () { showLesson(gid, ui); };
@@ -160,19 +164,24 @@
       (save.stars[gid + 'u' + (ui - 1)] || 0) > 0;
   }
   function showCourse() {
-    app.innerHTML = '<div class="topbar"><button class="back" id="back" aria-label="返回">←</button><h2>课程与课堂进度</h2></div><div class="card"><span class="eyebrow">外研版新标准</span><h2>从孩子正在学的主题开始</h2><p class="helper">目前词库按主题整理，并非课本目录。教材起点、上下册与修订版尚未核对，暂不标注课本 Unit。选择主题只调整学习起点，不会授予已掌握记录。</p><label for="gradeSelect">年级</label><select id="gradeSelect">' + ['g1', 'g2', 'g3'].map(function (g) { return '<option value="' + g + '"' + (save.course.grade === g ? ' selected' : '') + '>' + window.DB[g].title + '</option>'; }).join('') + '</select><label for="unitSelect">课堂相关主题</label><select id="unitSelect"></select><button class="btn green" id="saveCourse">保存学习起点</button></div><div class="card"><h3>如何确认教材？</h3><p class="helper">查看封面的“一年级起点 / 三年级起点”、年级、上下册和版权页年份，再对照目录。核对后才能建立准确的 Module / Unit 对应。</p><a class="source-link" href="https://tjebook.nse.cn/t/pc.html" target="_blank" rel="noopener">外研社「网上新标准」教材入口 ↗</a></div>';
+    app.innerHTML = '<div class="topbar"><button class="back" id="back" aria-label="返回">←</button><h2>课程与课堂进度</h2></div><div class="card"><span class="eyebrow">已确认教材</span><h2>跟着课本，分组练习</h2><p class="helper">外研新标准（三年级起点），三年级上册，2024年7月第1版，孙有中主编；ISBN 978-7-5213-5489-8。2026年是重印年份。目录和单元词表已核对，每组5–6个词；小组是App划分，不是课本课时编号。选择起点不授予掌握记录。</p><label for="gradeSelect">教材或拓展主题</label><select id="gradeSelect">' + COURSE_IDS.map(function (g) { return '<option value="' + g + '"' + (save.course.grade === g ? ' selected' : '') + '>' + courseTitle(g) + '</option>'; }).join('') + '</select><label for="unitSelect">课堂对应学习组</label><select id="unitSelect"></select><button class="btn green" id="saveCourse">保存学习起点</button></div><div class="card"><h3>同步范围</h3><p class="helper">Welcome及Unit 1–6的词汇、常用表达与单元目标；例句为App自编，未复制整篇课文、歌曲或插图。课文朗读、戏剧和课堂活动请结合纸质课本完成。原主题练习和学习记录仍保留。</p><a class="source-link" href="https://www.fltrp.com/upload/resources/file/2024/08/01/92191.pdf" target="_blank" rel="noopener">外研社官方书目：核对ISBN ↗</a></div>';
     function options() { var gid = $('#gradeSelect').value; $('#unitSelect').innerHTML = window.DB[gid].units.map(function (u, i) { return '<option value="' + i + '"' + (gid === save.course.grade && i === save.course.unit ? ' selected' : '') + '>' + (i + 1) + '. ' + u.title + '</option>'; }).join(''); }
     options(); $('#gradeSelect').onchange = options;
     $('#back').onclick = showHome;
     $('#saveCourse').onclick = function () { save.course = { grade: $('#gradeSelect').value, unit: +$('#unitSelect').value }; persist(); showHome(); };
   }
+  function textbookNote(gid, unit) {
+    if (gid !== BOOK_ID) return '';
+    var chapter = window.DB[gid].chapters[unit.chapter];
+    return '<div class="card textbook-note"><span class="eyebrow">' + chapter.label + ' · 课本第' + chapter.pages + '页</span><h3>' + chapter.en + '</h3><p class="helper">本单元目标：' + chapter.goal + '</p><p class="helper">' + chapter.patterns.join('<br>') + '</p><p class="helper">课本配合任务：' + chapter.task + '</p><small>下方五步用于词汇巩固，不替代课文和课堂活动；例句为App自编，跟读由孩子或家长检查。</small></div>';
+  }
   function showLesson(gid, ui) {
     if (!unitOpen(gid, ui)) { toast('先完成上一主题检测'); return; }
     var u = window.DB[gid].units[ui], p = Learning.progress(save, gid, ui);
-    app.innerHTML = '<div class="topbar"><button class="back" id="back" aria-label="返回">←</button><h2>' + u.title + '</h2></div><div class="lesson-intro"><span class="eyebrow">' + window.DB[gid].title + ' · 主题 ' + (ui + 1) + '</span><h1>从听懂，到会用。</h1><p>' + u.words.length + ' 个词 · 可以分几次学完</p></div><div class="stage-list">' + Learning.stages.map(function (st) {
+    app.innerHTML = '<div class="topbar"><button class="back" id="back" aria-label="返回">←</button><h2>' + (gid === BOOK_ID ? window.DB[gid].chapters[u.chapter].label + ' · 第' + u.group + '组' : u.title) + '</h2></div><div class="lesson-intro"><span class="eyebrow">' + window.DB[gid].title + ' · 学习组 ' + (ui + 1) + '</span><h1>从听懂，到会用。</h1><p>' + u.words.length + ' 个词 · 可以分几次学完</p></div>' + textbookNote(gid, u) + '<div class="stage-list">' + Learning.stages.map(function (st) {
       var open = Learning.available(save, gid, ui, st.id);
-      return '<button class="stage ' + (p[st.id] ? 'complete' : '') + '" data-stage="' + st.id + '"' + (open ? '' : ' disabled') + '><span class="stage-number">' + (p[st.id] ? '✓' : st.icon) + '</span><span><strong>' + st.title + '</strong><small>' + st.desc + '</small></span><span class="stage-arrow">' + (open ? '›' : '待解锁') + '</span></button>';
-    }).join('') + '</div><p class="helper">每步覆盖本主题全部单词；检测要求总体与独立拼写正确率都达到 80%。例句跟读由孩子或家长自行检查，本 App 不进行口语评分。</p>';
+      return '<button class="stage ' + (p[st.id] ? 'complete' : '') + '" data-stage="' + st.id + '"' + (open ? '' : ' disabled') + '><span class="stage-number">' + (p[st.id] ? '✓' : st.icon) + '</span><span><strong>' + (gid === BOOK_ID && st.id === 'check' ? '本组小检测' : gid === BOOK_ID && st.id === 'learn' ? '认识本组词语' : st.title) + '</strong><small>' + st.desc + '</small></span><span class="stage-arrow">' + (open ? '›' : '待解锁') + '</span></button>';
+    }).join('') + '</div><p class="helper">每步覆盖本学习组全部单词；检测要求总体与独立拼写正确率都达到 80%。例句跟读由孩子或家长自行检查，本 App 不进行口语评分。</p>';
     $('#back').onclick = function () { showMap(gid); };
     $all('[data-stage]').forEach(function (b) { b.onclick = function () { var st = b.getAttribute('data-stage'); if (st === 'learn') showLearn(gid, ui); else startQuiz(gid, ui, st); }; });
   }
@@ -284,7 +293,7 @@
 
   /* ================= 家长中心 ================= */
   function showParent() {
-    var rows = ['g1', 'g2', 'g3'].map(function (gid) {
+    var rows = COURSE_IDS.map(function (gid) {
       var g = window.DB[gid];
       var stars = g.units.map(function (u, i) {
         var st = save.stars[gid + 'u' + i] || 0;
@@ -293,7 +302,7 @@
       return '<div class="rp-row"><div class="rp-g">' + g.icon + g.title + '</div><div class="rp-stars">' + stars + '</div></div>';
     }).join('');
     var doneCnt = 0, totalUnits = 0;
-    ['g1', 'g2', 'g3'].forEach(function (gid) {
+    COURSE_IDS.forEach(function (gid) {
       totalUnits += window.DB[gid].units.length;
       window.DB[gid].units.forEach(function (u, i) { if ((save.stars[gid + 'u' + i] || 0) > 0) doneCnt++; });
     });
@@ -306,7 +315,7 @@
       '<div class="stat">✅ ' + doneCnt + '/' + totalUnits + ' 关</div>' +
       '<div class="stat">📕 错词 ' + Object.keys(save.wrong).length + '</div></div>' +
       rows + '</div>' +
-      '<button class="vocab-entry" id="masteryReportBtn"><span>▥</span><span><strong>真实掌握报告</strong><small>分项表现、延迟复测与薄弱词</small></span><b>→</b></button><div class="card"><div class="rp-title">学习路线与复习</div><p class="helper">五步依次完成；检测总体与独立拼写正确率都达到 80% 后进阶。旧版星星保留，但不代表已完成新版五步学习。当前共有 ' + Object.keys(save.lessons).filter(function (id) { return save.lessons[id].check; }).length + ' 个主题完成检测，' + Learning.due(save, Date.now()).length + ' 个词到期复习。<br>教材：外研版新标准；起点、册次待核对。口语跟读请由孩子或家长检查。</p><a class="source-link" href="https://ies.ed.gov/ncee/wwc/PracticeGuide/1" target="_blank" rel="noopener">学习设计参考：IES 间隔学习与主动回忆指南 ↗</a></div>' +
+      '<button class="vocab-entry" id="masteryReportBtn"><span>▥</span><span><strong>真实掌握报告</strong><small>分项表现、延迟复测与薄弱词</small></span><b>→</b></button><div class="card"><div class="rp-title">学习路线与复习</div><p class="helper">五步依次完成；检测总体与独立拼写正确率都达到 80% 后进阶。旧版星星保留，但不代表已完成新版五步学习。当前共有 ' + Object.keys(save.lessons).filter(function (id) { return save.lessons[id].check; }).length + ' 个学习组/主题完成检测，' + Learning.due(save, Date.now()).length + ' 个词到期复习。<br>教材：外研新标准（三起）2024版三年级上册，已核对目录与单元词表。口语跟读请由孩子或家长检查。</p><a class="source-link" href="https://ies.ed.gov/ncee/wwc/PracticeGuide/1" target="_blank" rel="noopener">学习设计参考：IES 间隔学习与主动回忆指南 ↗</a></div>' +
       '<div class="card"><div class="rp-title">护眼、时长与进度保护</div><button class="btn green" id="careSettingsBtn">护眼与使用时长</button><button class="btn ghost" id="backupBtn" style="margin-top:14px">备份与恢复进度</button></div>' +
       '<div class="card"><div class="rp-title">🔄 版本与更新</div>' +
       '<div class="rp-note">当前版本：' + (window.AppUpdate ? window.AppUpdate.version() : '未知') +
@@ -365,17 +374,18 @@
       var st = save.stars[id] || 0;
       var locked = !unitOpen(gid, i);
       var stars = '<span class="' + (st >= 1 ? 'on' : '') + '">★</span><span class="' + (st >= 2 ? 'on' : '') + '">★</span><span class="' + (st >= 3 ? 'on' : '') + '">★</span>';
-      return '<button type="button" class="unit' + (locked ? ' locked' : '') + '" data-u="' + i + '"' + (locked ? ' disabled' : '') + '>' +
+      var heading = gid === BOOK_ID && (i === 0 || g.units[i - 1].chapter !== u.chapter) ? '<div class="textbook-chapter"><h3>' + g.chapters[u.chapter].label + ' · ' + g.chapters[u.chapter].title + '</h3><p class="helper">课本第' + u.pages + '页</p></div>' : '';
+      return heading + '<button type="button" class="unit' + (locked ? ' locked' : '') + '" data-u="' + i + '"' + (locked ? ' disabled' : '') + '>' +
         '<div class="uicon">' + (locked ? '🔒' : u.icon) + '</div>' +
-        '<div class="uinfo"><div class="utitle">' + (i + 1) + '. ' + u.title + '</div>' +
-        '<div class="uen">' + u.en + ' · ' + u.words.length + '词</div>' +
+        '<div class="uinfo"><div class="utitle">' + (gid === BOOK_ID ? '第' + u.group + '组 · ' + u.words.length + '个词' : (i + 1) + '. ' + u.title) + '</div>' +
+        '<div class="uen">' + (gid === BOOK_ID ? u.words.slice(0, 3).map(function (w) { return w.w; }).join(' · ') : u.en + ' · ' + u.words.length + '词') + '</div>' +
         '<div class="ustars">' + stars + '</div></div>' +
         (locked ? '<div class="lock">🔒</div>' : '<div class="go">▶</div>') + '</button>';
     }).join('');
     app.innerHTML =
       '<div class="topbar"><button class="back" id="back">←</button><h2>' + g.icon + ' ' + g.title + '</h2>' +
       '<span class="coins">💰 ' + save.coins + '</span></div>' +
-      '<p class="helper">主题学习路线 · 教材起点与册次待核对。每个主题包含 5 个步骤。</p><div class="unit-grid">' + rows + '</div>';
+      '<p class="helper">' + (gid === BOOK_ID ? '按Welcome与六个Unit顺序学习；每组5–6词，先完成本组五步再前进。可在课程设置选择课堂起点。' : '拓展主题练习；每个主题包含5个步骤。') + '</p><div class="unit-grid">' + rows + '</div>';
     $('#back').onclick = showHome;
     $all('.unit').forEach(function (el) {
       el.onclick = function () {
@@ -453,13 +463,13 @@
       words = vocabSession ? vocabSession.words : [];
     } else if (mode === 'review') {
       var due = Learning.due(save, Date.now()).slice(0, QUIZ_LEN);
-      var catalog = [].concat(allWords('g1'), allWords('g2'), allWords('g3'));
+      var catalog = allCourseWords();
       words = due.map(function (w) { return catalog.find(function (x) { return x.w === w; }); }).filter(Boolean);
     } else if (mode === 'wrong') {
       var found = [];
       Object.keys(save.wrong).forEach(function (k) {
         var it = save.wrong[k];
-        ['g1', 'g2', 'g3'].forEach(function (g) {
+        COURSE_IDS.forEach(function (g) {
           window.DB[g].units.forEach(function (u) {
             u.words.forEach(function (x) { if (x.w === it.word && !found.some(function (v) { return v.w === x.w; })) found.push(x); });
           });
@@ -471,7 +481,7 @@
       words = shuffle(u.words);
     }
     if (!words.length) { toast('没有单词可练'); return; }
-    var pool = mode === 'vocab' ? Vocabulary.words : (mode === 'wrong' || mode === 'review') ? [].concat(allWords('g1'), allWords('g2'), allWords('g3')) : allWords(gid);
+    var pool = mode === 'vocab' ? Vocabulary.words : (mode === 'wrong' || mode === 'review') ? allCourseWords() : allWords(gid);
     var qs = [];
     words.forEach(function (w, i) {
       var reviewing = mode === 'review' || mode === 'wrong' || (mode === 'vocab' && vocabSession.mode === 'review');
@@ -924,7 +934,7 @@
         restoreCandidate = Care.decode(text, newSave());
         if (!window.DB[restoreCandidate.course.grade].units[restoreCandidate.course.unit]) throw new Error('备份中的课程起点不在当前词库内');
         $('#restorePreview').innerHTML = '<p class="helper"></p><button class="btn green" id="confirmRestore">确认覆盖并恢复</button>';
-        $('p', $('#restorePreview')).textContent = '校验通过：' + restoreCandidate.coins + ' 金币，' + Object.keys(restoreCandidate.lessons).length + ' 个主题有学习记录，' + Object.keys(restoreCandidate.vocab.records).length + ' 个积累词有记录。';
+        $('p', $('#restorePreview')).textContent = '校验通过：' + restoreCandidate.coins + ' 金币，' + Object.keys(restoreCandidate.lessons).length + ' 个学习组/主题有学习记录，' + Object.keys(restoreCandidate.vocab.records).length + ' 个积累词有记录。';
         $('#confirmRestore').onclick = function () { commitRestore(restoreCandidate, false); };
       } catch (e) { restoreCandidate = null; $('#restorePreview').textContent = e.message || '备份无效，现有进度未修改'; }
     }

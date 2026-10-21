@@ -34,7 +34,7 @@
   function normal(text) { return String(text).trim().toLowerCase().replace(/[’‘]/g, "'").replace(/\s+/g, ' '); }
   function spellingCorrect(input, target) {
     var aliases = {
-      'a/an': ['a', 'an'], colour: ['color'], favourite: ['favorite'], maths: ['math', 'mathematics'],
+      'a/an': ['a', 'an'], "let's": ['let us'], dad: ['father'], mum: ['mother', 'mom'], grandpa: ['grandfather'], grandma: ['grandmother'], daddy: ['dad', 'father'], mummy: ['mum', 'mother', 'mom'], colour: ['color'], colourful: ['colorful'], favourite: ['favorite'], maths: ['math', 'mathematics'],
       bike: ['bicycle'], father: ['dad'], mother: ['mum', 'mom'], grandfather: ['grandpa'], grandmother: ['grandma'],
       goodbye: ['bye'], photo: ['photograph'], tv: ['television'], pe: ['physical education']
     };
