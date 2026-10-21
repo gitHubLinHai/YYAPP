@@ -75,11 +75,17 @@ public class MainActivity extends Activity {
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
-        if (keyCode == KeyEvent.KEYCODE_BACK && web != null && web.canGoBack()) {
-            web.goBack();
+        if (keyCode == KeyEvent.KEYCODE_BACK) {
+            onBackPressed();
             return true;
         }
         return super.onKeyDown(keyCode, event);
+    }
+
+    /** 系统返回键及边缘返回手势统一交给网页导航，首页也不退出 Activity。 */
+    @Override
+    public void onBackPressed() {
+        if (web != null) web.evaluateJavascript("if(window.AppNav){window.AppNav.back();}else{window.history.back();}", null);
     }
 
     /** 递归拷贝 assets 资源到内部存储 */

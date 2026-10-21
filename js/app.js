@@ -317,7 +317,7 @@
       '<button class="btn ghost" id="resetBtn">清空所有进度（重置）</button></div>';
     $('#back').onclick = showHome;
     $('#resetBtn').onclick = function () {
-      if (confirm('确定要清空所有课程进度、词汇积累、作答记录、金币和错题本吗？护眼设置和使用时长保留。')) { var careState = save.care; save = newSave(); save.care = careState; persist(); toast('已重置'); showParent(); }
+      if (confirm('确定要清空所有课程进度、词汇积累、作答记录、金币和错题本吗？护眼设置和使用时长保留。')) { var careState = save.care; save = newSave(); save.care = careState; persist(); resetNavigation(); toast('已重置'); showHome(); }
     };
     $('#careSettingsBtn').onclick = showCareSettings;
     $('#backupBtn').onclick = showBackup;
@@ -549,8 +549,6 @@
     // 绑定
     $('#quitQuiz').onclick = function () {
       var m = quiz && quiz.mode, g = quiz && quiz.gid, quizUnit = quiz && quiz.ui;
-      cancelAdvance();
-      quiz = null;
       if (m === 'vocab') showVocabulary(); else if (m === 'wrong') showWrong(); else if (m === 'review') showReview(); else if (g) showLesson(g, quizUnit);
     };
     if (q.type === 'listen') { $('#replay').onclick = function () { say(q.w.w, 'words'); }; say(q.w.w, 'words'); }
@@ -765,7 +763,7 @@
       '<div class="opts">' + q.opts.map(function (o) {
         return '<div class="opt big" data-l="' + o + '">' + o + ' ' + o.toLowerCase() + '</div>';
       }).join('') + '</div>';
-    $('#quitQuiz').onclick = function () { cancelAdvance(); phq = null; showPhonics(); };
+    $('#quitQuiz').onclick = showPhonics;
     $('#replay').onclick = function () { say(q.word, 'words'); };
     say(q.word, 'words');
     $all('.opt').forEach(function (el) {
@@ -950,12 +948,112 @@
     } catch (e) { toast('存储空间不足，未覆盖当前进度；请先导出备份'); return; }
     save = data; restoreCandidate = null;
     if (undo) localStorage.removeItem(KEY + '_before_restore');
-    backupOpen = false; careSettingsOpen = false; leavePractice(); showHome(); startEyeTimer(); toast('进度已恢复');
+    backupOpen = false; careSettingsOpen = false; leavePractice(); resetNavigation(); showHome(); startEyeTimer(); toast('进度已恢复');
+  }
+
+  /* ================= 页面历史与横向手势 ================= */
+  var navigation = { entries: [], index: -1, replaying: false, moving: false, token: Date.now() };
+  function navigationBlocked() { return !!$('#careOverlay') || !!$('#updateOverlay'); }
+  function capturePage() {
+    var entry = navigation.entries[navigation.index];
+    if (!entry) return;
+    entry.scroll = window.scrollY;
+    if (entry.cached) {
+      pauseStudy();
+      entry.snapshot = { nodes: Array.prototype.slice.call(app.childNodes), quiz: quiz, phq: phq, learn: learn, vocab: vocabSession,
+        task: pendingAdvance ? { fn: pendingAdvance.fn, remaining: pendingAdvance.remaining } : null, time: Date.now() };
+    }
+  }
+  function stopPage() {
+    pauseStudy(); cancelAdvance(); quiz = null; phq = null; pauseStarted = 0;
+    careSettingsOpen = false; backupOpen = false;
+  }
+  function restorePage(entry) {
+    stopPage(); navigation.replaying = true;
+    if (entry.snapshot) {
+      var snap = entry.snapshot;
+      app.replaceChildren.apply(app, snap.nodes);
+      quiz = snap.quiz; phq = snap.phq; learn = snap.learn; vocabSession = snap.vocab;
+      careSettingsOpen = entry.name === 'care'; backupOpen = entry.name === 'backup';
+      if (quiz) quiz.qs[quiz.idx].started += Date.now() - snap.time;
+      if (snap.task) scheduleAdvance(snap.task.fn, snap.task.remaining);
+    } else entry.render();
+    navigation.replaying = false;
+    window.scrollTo(0, entry.scroll || 0); syncCare();
+  }
+  function goPage(delta) {
+    if (navigation.moving || navigationBlocked()) return false;
+    var next = navigation.index + delta;
+    if (next < 0 || next >= navigation.entries.length) { toast(delta < 0 ? '已经是第一页' : '没有可前进的页面'); return false; }
+    navigation.moving = true; window.history.go(delta); return true;
+  }
+  function trackPage(name, render, cached) {
+    return function () {
+      var args = Array.prototype.slice.call(arguments), key = name + (cached || name === 'result' ? '' : JSON.stringify(args));
+      if (navigation.replaying) return render.apply(null, args);
+      var current = navigation.entries[navigation.index];
+      if (navigation.index > 0 && navigation.entries[navigation.index - 1].key === key && name !== 'result') { goPage(-1); return; }
+      capturePage(); stopPage();
+      var entry = { name: name, key: key, cached: cached, render: function () { render.apply(null, args); } };
+      navigation.replaying = true; entry.render(); navigation.replaying = false;
+      var replace = current && (current.key === key || (name === 'result' && current.name === 'quiz'));
+      if (replace) navigation.entries[navigation.index] = entry;
+      else { navigation.entries = navigation.entries.slice(0, navigation.index + 1); navigation.entries.push(entry); navigation.index++; }
+      window.history[replace ? 'replaceState' : 'pushState']({ eqPage: navigation.index, token: navigation.token }, '');
+      window.scrollTo(0, 0); syncCare();
+    };
+  }
+  function resetNavigation() {
+    navigation.entries = []; navigation.index = -1; navigation.token = Date.now() + Math.random();
+    window.history.replaceState({ eqPage: -1, token: navigation.token }, '');
+  }
+  function initNavigation() {
+    window.history.replaceState({ eqPage: -1, token: navigation.token }, '');
+    window.AppNav = { back: function () { return goPage(-1); }, forward: function () { return goPage(1); } };
+    window.addEventListener('popstate', function (event) {
+      var state = event.state;
+      if (state && state.token === navigation.token && state.eqPage === navigation.index) { navigation.moving = false; return; }
+      if (!state || state.token !== navigation.token || state.eqPage < 0 || navigationBlocked()) {
+        navigation.moving = true; window.history.go(state && state.token === navigation.token && state.eqPage > navigation.index ? -1 : 1); return;
+      }
+      capturePage(); navigation.index = state.eqPage;
+      restorePage(navigation.entries[navigation.index]); navigation.moving = false;
+    });
+    showHome = trackPage('home', showHome);
+    showMap = trackPage('map', showMap);
+    showLesson = trackPage('lesson', showLesson);
+    showCourse = trackPage('course', showCourse, true);
+    showReview = trackPage('review', showReview);
+    showVocabulary = trackPage('vocabulary', showVocabulary);
+    showMasteryReport = trackPage('report', showMasteryReport);
+    showParent = trackPage('parent', showParent);
+    showWrong = trackPage('wrong', showWrong);
+    showPhonics = trackPage('phonics', showPhonics);
+    showLearn = trackPage('learn', showLearn, true);
+    renderVocabCard = trackPage('vocabcard', renderVocabCard, true);
+    startQuiz = trackPage('quiz', startQuiz, true);
+    startPhQuiz = trackPage('phquiz', startPhQuiz, true);
+    showResult = trackPage('result', showResult);
+    showCareSettings = trackPage('care', showCareSettings, true);
+    showBackup = trackPage('backup', showBackup, true);
+    var touch = null;
+    app.addEventListener('touchstart', function (event) {
+      var t = event.touches[0];
+      touch = event.touches.length === 1 && !event.target.closest('input,textarea,select,button,[contenteditable]') ? { x: t.clientX, y: t.clientY, at: Date.now() } : null;
+    }, { passive: true });
+    app.addEventListener('touchend', function (event) {
+      if (!touch || event.touches.length) { touch = null; return; }
+      var t = event.changedTouches[0], dx = t.clientX - touch.x, dy = t.clientY - touch.y, elapsed = Date.now() - touch.at;
+      touch = null;
+      if (elapsed < 900 && Math.abs(dx) >= 80 && Math.abs(dx) > Math.abs(dy) * 1.8) goPage(dx > 0 ? -1 : 1);
+    }, { passive: true });
+    app.addEventListener('touchcancel', function () { touch = null; }, { passive: true });
   }
 
   /* ================= 启动 ================= */
   window.addEventListener('error', function (e) { if (window.console) console.error('AppError:', e.message); });
   applyReading();
+  initNavigation();
   showHome();
   startEyeTimer();
   // Wi-Fi 自动下载安装并载入；移动网络保留手动入口。

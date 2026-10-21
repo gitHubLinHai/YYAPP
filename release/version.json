@@ -1,6 +1,6 @@
 {
-  "versionName": "1.0.3",
-  "versionCode": 103,
-  "wgt": "EnglishQuest-v1.0.3.wgt",
-  "notes": "Wi-Fi 自动更新，移动网络可手动更新（需新版 APK）；新增一键护眼、学习时长与备份；完善词汇积累和分步复习"
+  "versionName": "1.0.4",
+  "versionCode": 104,
+  "wgt": "EnglishQuest-v1.0.4.wgt",
+  "notes": "新增页面右滑返回、左滑前进；保留原题和表单状态；修复系统返回手势退出（需覆盖安装 v1.0.4 APK）"
 }
