@@ -5,12 +5,12 @@ const source = fs.readFileSync(require('node:path').join(__dirname, '../js/updat
 function native(type) {
   let net = type || 'unknown', now = Date.now(); const timers = [];
   const calls = [];
-  const window = { setInterval(fn) { timers.push(fn); return 1; }, addEventListener() {}, location: { reload() { calls.push('reload'); } }, AndroidBridge: {
+  const window = { setInterval(fn) { timers.push(fn); return 1; }, addEventListener() {}, location: { href: 'file:///data/user/0/com.family.englishquest/files/www/index.html?textbook=107&eqReload=old#route', replace(url) { this.href = url; calls.push('replace'); } }, AndroidBridge: {
     startCheck() { calls.push('check'); }, applyUpdate() { calls.push('apply'); },
     networkType() { return net; }, applyWifiUpdate() { calls.push('wifiApply'); },
     versionInfo() { return JSON.stringify({ name: '1.0.2', code: 102 }); }
   } };
-  vm.runInNewContext(source, { window, Date: { now: () => now } });
+  vm.runInNewContext(source, { window, URL, Date: { now: () => now } });
   return { window, calls, update: window.AppUpdate, tick: () => timers[0](), network: t => { net = t; }, advance: ms => { now += ms; } };
 }
 (async function () {
@@ -35,7 +35,13 @@ function native(type) {
   window.__updCb({ state: 'done', version: '1.0.3' });
   assert.equal(states.at(-1).state, 'installed');
   update.restart();
-  assert.equal(calls.at(-1), 'reload', '原生安卓重新加载页面，不调用 plus');
+  assert.equal(calls.at(-1), 'replace', '原生安卓通过新URL载入入口，不复用原页面URL');
+  let reloaded = new URL(window.location.href);
+  assert.equal(reloaded.protocol, 'file:');
+  assert.equal(reloaded.searchParams.get('textbook'), '107');
+  assert.equal(reloaded.searchParams.getAll('eqReload').length, 1);
+  assert.notEqual(reloaded.searchParams.get('eqReload'), 'old');
+  assert.equal(reloaded.hash, '#route');
   update.check(false, st => states.push(st));
   window.__updCb({ state: 'error', msg: 'offline' });
   update.check(false, st => states.push(st));

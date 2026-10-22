@@ -16,7 +16,7 @@ const base = 'http://127.0.0.1:8123';
       window.__hidden = false;
       Object.defineProperty(document, 'hidden', { configurable: true, get: () => window.__hidden });
     });
-    await page.route('**/js/app.js', route => {
+    await page.route('**/js/app.js*', route => {
       const source = fs.readFileSync(path.join(__dirname, '../js/app.js'), 'utf8');
       route.fulfill({ contentType: 'application/javascript', body: source.replace(/  showHome\(\);\r?\n  startEyeTimer\(\);/, '  window.__careTest = { state: function () { return { save: save, quiz: quiz }; }, sync: syncCare, quiz: startQuiz };\n  showHome();\n  startEyeTimer();') });
     });

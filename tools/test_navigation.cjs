@@ -12,7 +12,7 @@ const path = require('node:path');
       window.AndroidBridge = { exitApp: () => { window.exitCalls++; } };
       window.Audio = function () { this.play = () => Promise.resolve(); this.pause = () => {}; };
     });
-    await page.route('**/js/app.js', route => {
+    await page.route('**/js/app.js*', route => {
       const source = fs.readFileSync(path.join(__dirname, '../js/app.js'), 'utf8');
       return route.fulfill({ contentType: 'application/javascript', body: source.replace('  initNavigation();', '  window.__navTest = { state: () => ({ quiz, phq, save, navigation, pendingAdvance }), quiz: startQuiz, sync: syncCare };\n  initNavigation();') });
     });

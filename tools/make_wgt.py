@@ -45,6 +45,18 @@ if bump:
     json.dump(man, open(MANIFEST, 'w', encoding='utf-8'), ensure_ascii=False, indent=2)
     print('版本已升级: %s (versionCode=%d)' % (man['versionName'], man['versionCode']))
 
+# 每次热更为脚本、词库和样式换资源URL，避免WebView继续使用旧路径的缓存。
+for entry in ['index.html', 'test.html']:
+    entry_path = os.path.join(BASE, entry)
+    if not os.path.isfile(entry_path):
+        continue
+    with open(entry_path, encoding='utf-8') as source:
+        html = source.read()
+    html = re.sub(r'''((?:src|href)=["'])([^"'?]+\.(?:js|css))(?:\?[^"']*)?(["'])''',
+                  lambda m: m[1] + m[2] + '?v=' + str(man['versionCode']) + m[3], html)
+    with open(entry_path, 'w', encoding='utf-8', newline='') as target:
+        target.write(html)
+
 wgt_name = 'EnglishQuest-v%s.wgt' % man['versionName']
 os.makedirs(OUT, exist_ok=True)
 wgt_path = os.path.join(OUT, wgt_name)

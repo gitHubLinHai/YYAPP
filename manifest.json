@@ -2,8 +2,8 @@
   "name": "英语拼读闯关",
   "appid": "",
   "description": "外研新标准三年级词汇巩固、四上核心词起步与系统自然拼读",
-  "versionName": "1.0.10",
-  "versionCode": 110,
+  "versionName": "1.0.11",
+  "versionCode": 111,
   "launch_path": "index.html",
   "app-plus": {
     "screenOrientation": [

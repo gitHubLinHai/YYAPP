@@ -49,7 +49,7 @@ const { chromium } = require('playwright');
       window.setTimeout = (fn, ms, ...args) => original(fn, ms === 750 || ms === 1400 ? 10 : ms, ...args);
       window.played = []; window.Audio = function (url) { this.play = () => { played.push(url); return Promise.resolve(); }; this.pause = () => {}; };
     });
-    await page.route('**/js/app.js', route => route.fulfill({ contentType: 'application/javascript', body: fs.readFileSync(path.join(root, 'js/app.js'), 'utf8').replace('  initNavigation();', '  window.__newTest = { state: () => ({save, phq, quiz}), practice: startPhonicsPractice, lesson: showPhonicsLesson, home: showHome, sync: syncCare, persist, quiz: startQuiz };\n  initNavigation();') }));
+    await page.route('**/js/app.js*', route => route.fulfill({ contentType: 'application/javascript', body: fs.readFileSync(path.join(root, 'js/app.js'), 'utf8').replace('  initNavigation();', '  window.__newTest = { state: () => ({save, phq, quiz}), practice: startPhonicsPractice, lesson: showPhonicsLesson, home: showHome, sync: syncCare, persist, quiz: startQuiz };\n  initNavigation();') }));
     await page.goto('http://127.0.0.1:8123');
     await page.locator('#courseBtn').click();
     assert.equal(await page.locator('#gradeSelect option').count(), 6);

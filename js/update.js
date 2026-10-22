@@ -191,7 +191,11 @@ window.AppUpdate = (function () {
 
   function restart() {
     if (env() === 'hbuilder') plus.runtime.restart();
-    else window.location.reload();
+    else {
+      var url = new URL(window.location.href);
+      url.searchParams.set('eqReload', String(Date.now()));
+      window.location.replace(url.href);
+    }
   }
   return { check: check, startAuto: startAuto, network: network, env: env, version: version, restart: restart };
 })();

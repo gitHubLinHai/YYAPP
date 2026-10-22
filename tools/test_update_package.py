@@ -87,6 +87,7 @@ public class CheckPackage {
     for directory in ['css', 'js', 'data', 'audio']:
         (project / directory).mkdir()
     for reference in re.findall(r"""(?:src|href)=["']([^"']+)["']""", (ROOT / 'index.html').read_text(encoding='utf-8')):
+        reference = reference.split('?')[0].split('#')[0]
         target = project / reference
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes((ROOT / reference).read_bytes())
@@ -95,6 +96,13 @@ public class CheckPackage {
     data = (project / 'release' / info['wgt']).read_bytes()
     assert info['wgtSize'] == len(data)
     assert info['wgtSha256'] == hashlib.sha256(data).hexdigest()
+    with zipfile.ZipFile(io.BytesIO(data)) as package:
+        html = package.read('index.html').decode('utf-8')
+        urls = re.findall(r"""(?:src|href)=["']([^"']+\.(?:js|css)\?[^"']+)["']""", html)
+        assert len(urls) == 14, '全部入口脚本、词库和样式都必须带版本'
+        for url in urls:
+            assert url.endswith('?v=' + str(info['versionCode']))
+            assert package.read(url.split('?')[0]), url
     (project / 'data/textbook.js').write_bytes(b'')
     failed = subprocess.run([os.sys.executable, str(project / 'tools/make_wgt.py'), '--no-bump'], capture_output=True)
     assert failed.returncode != 0, '入口引用的空资源必须阻止发布'

@@ -34,7 +34,7 @@ const { chromium } = require('playwright');
       window.setTimeout = (fn, ms, ...args) => original(fn, ms === 750 || ms === 1400 ? 5 : ms, ...args);
       window.Audio = function () { this.play = () => Promise.resolve(); this.pause = () => {}; };
     });
-    await page.route('**/js/app.js', route => {
+    await page.route('**/js/app.js*', route => {
       const s = fs.readFileSync(path.join(root, 'js/app.js'), 'utf8');
       return route.fulfill({ contentType: 'application/javascript', body: s.replace('  initNavigation();', '  window.__bookTest = { state: () => ({save, quiz}), quiz: startQuiz, persist: persist };\n  initNavigation();') });
     });

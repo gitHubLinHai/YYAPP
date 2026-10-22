@@ -16,7 +16,7 @@ const base = 'http://127.0.0.1:8123';
       window.Audio = function () { this.play = () => Promise.resolve(); this.pause = () => {}; };
     });
     // 只在测试响应中开放状态检查，不向生产文件添加调试接口。
-    await page.route('**/js/app.js', route => {
+    await page.route('**/js/app.js*', route => {
       const source = fs.readFileSync(path.join(__dirname, '../js/app.js'), 'utf8');
       route.fulfill({ contentType: 'application/javascript', body: source.replace(/  showHome\(\);\r?\n  startEyeTimer\(\);/, '  if (!sessionStorage.getItem("legacyTestStarted")) { save.course = { grade: "g1", unit: 0 }; persist(); sessionStorage.setItem("legacyTestStarted", "yes"); }\n  window.__test = { state: function () { return { quiz: quiz, save: save, phq: phq }; }, quiz: startQuiz, fixture: function (data) { save = newSave(); save.course = { grade: "g1", unit: 0 }; for (var k in save) if (data[k] !== undefined) save[k] = data[k]; persist(); } };\n  showHome();\n  startEyeTimer();') });
     });

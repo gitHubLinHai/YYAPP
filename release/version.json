@@ -1,8 +1,8 @@
 {
-  "versionName": "1.0.10",
-  "versionCode": 110,
-  "wgt": "EnglishQuest-v1.0.10.wgt",
-  "wgtSize": 11343909,
-  "wgtSha256": "6f7446f1e040c3ddbe9a96288be05aa5a6ec27531081dac3f94744cebb2c09a8",
-  "notes": "新增三下199词与表达、四上72核心词起步包、20课系统自然拼读；完善阶段解锁、复测、护眼与备份兼容"
+  "versionName": "1.0.11",
+  "versionCode": 111,
+  "wgt": "EnglishQuest-v1.0.11.wgt",
+  "wgtSize": 11343975,
+  "wgtSha256": "7f786771e3632cd1892a06d663f68cd97faa905360b9c91d6e637ea3779f1f0a",
+  "notes": "修复热更后仍显示旧页面、必须杀进程才生效：入口强制切换，脚本词库和样式按版本刷新"
 }
