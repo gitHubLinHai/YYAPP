@@ -28,13 +28,18 @@ def load_js(path):
     txt = open(path, encoding='utf-8').read()
     m = re.search(r'window\.DB\.\w+\s*=\s*', txt)
     start = txt.index('{', m.end())
-    return json.loads(txt[start: txt.rindex('}') + 1])
+    return json.JSONDecoder().raw_decode(txt[start:])[0]
 
 
 def collect():
     words, sents = {}, {}
     for f in ('grade1.js', 'grade2.js', 'grade3.js', 'textbook.js'):
         db = load_js(os.path.join(DATA, f))
+        for u in db['units']:
+            for w in u['words']:
+                words[w['w']] = True
+                sents[w['ex']] = True
+    for db in load_js(os.path.join(DATA, 'textbooks.js')).values():
         for u in db['units']:
             for w in u['words']:
                 words[w['w']] = True
@@ -103,6 +108,13 @@ async def main():
         tasks.append(gen_one(sem, s, VOICE_SENT, RATE_SENT, os.path.join(out_s, slug(s) + '.mp3')))
     for l in letters:
         tasks.append(gen_one(sem, l, VOICE_WORD, '+0%', os.path.join(out_l, l.lower() + '.mp3')))
+    out_ph = os.path.join(BASE, 'audio', 'phonics'); os.makedirs(out_ph, exist_ok=True)
+    phonics = load_js(os.path.join(DATA, 'phonics.js'))
+    ph_words = set()
+    for lesson in phonics['course']:
+        ph_words.update(lesson['practice'] + lesson['transfer'] + [m['w'] for m in lesson['models']])
+    for w in sorted(ph_words):
+        tasks.append(gen_one(sem, w, 'en-GB-SoniaNeural', RATE_WORD, os.path.join(out_ph, slug(w) + '.mp3')))
 
     print('共 %d 个音频任务(单词%d 例句%d 字母26)...' % (len(tasks), len(words), len(sents)))
     done, failed = 0, 0

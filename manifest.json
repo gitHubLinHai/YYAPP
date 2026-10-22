@@ -1,9 +1,9 @@
 {
   "name": "英语拼读闯关",
   "appid": "",
-  "description": "四川成都小学英语自然拼读与单词闯关（外研版新标准，1-3年级）",
-  "versionName": "1.0.9",
-  "versionCode": 109,
+  "description": "外研新标准三年级词汇巩固、四上核心词起步与系统自然拼读",
+  "versionName": "1.0.10",
+  "versionCode": 110,
   "launch_path": "index.html",
   "app-plus": {
     "screenOrientation": [

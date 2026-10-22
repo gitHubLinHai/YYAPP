@@ -1,8 +1,8 @@
 {
-  "versionName": "1.0.9",
-  "versionCode": 109,
-  "wgt": "EnglishQuest-v1.0.9.wgt",
-  "wgtSize": 8070350,
-  "wgtSha256": "b0e03a12db8cba242eca8fd19db5756a734e92decc02b3a31fc6006535ae0641",
-  "notes": "修复更新包下载失败不换源、资源替换中断恢复、版本记录滞后及教材文件漏检；原生修复需覆盖安装1.0.9 APK"
+  "versionName": "1.0.10",
+  "versionCode": 110,
+  "wgt": "EnglishQuest-v1.0.10.wgt",
+  "wgtSize": 11343909,
+  "wgtSha256": "6f7446f1e040c3ddbe9a96288be05aa5a6ec27531081dac3f94744cebb2c09a8",
+  "notes": "新增三下199词与表达、四上72核心词起步包、20课系统自然拼读；完善阶段解锁、复测、护眼与备份兼容"
 }

@@ -137,6 +137,7 @@ const base = 'http://127.0.0.1:8123';
     assert.match(await page.locator('#app').textContent(), /暂时没有到期/);
     await page.locator('#back').click();
     await page.locator('#phonicsBtn').click();
+    await page.locator('#phReference').click();
     await page.locator('#phQuizBtn').click();
     for (let i = 0; i < 6; i++) {
       const q = await page.evaluate(() => __test.state().phq.qs[__test.state().phq.idx]);

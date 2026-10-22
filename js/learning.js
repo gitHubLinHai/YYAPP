@@ -91,3 +91,26 @@
   root.Learning = { stages: stages, key: key, progress: progress, available: available, mark: mark, due: due,
     coreSkills: coreSkills, skillNames: skillNames, skillOf: skillOf, spellingCorrect: spellingCorrect, steady: steady, needsWork: needsWork, recordAttempt: recordAttempt, planTypes: planTypes };
 })(typeof window === 'undefined' ? globalThis : window);
+// 独立自然拼读进度；与旧字母小测、教材星星分别记录。
+(typeof window === 'undefined' ? globalThis : window).Phonics = (function () {
+  'use strict';
+  var stages = ['learn', 'listen', 'spell', 'check'];
+  function records(save) { return save.phonics.route1 || (save.phonics.route1 = {}); }
+  function state(save, id) { return records(save)[id] || {}; }
+  function open(save, i) { return i === 0 || !!state(save, DB.phonics.course[i - 1].id).check; }
+  function ready(save, i, stage) {
+    var n = stages.indexOf(stage);
+    return n >= 0 && open(save, i) && (n === 0 || !!state(save, DB.phonics.course[i].id)[stages[n - 1]]);
+  }
+  function mark(save, i, stage, right, total, now) {
+    if (!ready(save, i, stage) || total < 1 || right / total < 0.8) return false;
+    var id = DB.phonics.course[i].id, all = records(save), r = all[id] || (all[id] = {});
+    r[stage] = true;
+    if (stage === 'check' && (!r.lastReview || now - r.lastReview >= 86400000)) {
+      r.reviews = (r.reviews || 0) + 1; r.lastReview = now;
+      r.due = now + [1, 3, 7, 14, 30][Math.min(r.reviews - 1, 4)] * 86400000;
+    }
+    return true;
+  }
+  return { stages: stages, state: state, open: open, ready: ready, mark: mark };
+})();
