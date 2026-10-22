@@ -1,8 +1,8 @@
 {
-  "versionName": "1.0.8",
-  "versionCode": 108,
-  "wgt": "EnglishQuest-v1.0.8.wgt",
-  "wgtSize": 8070323,
-  "wgtSha256": "57f9a42f8664e611a37c92e9f3dd37c2c621c3e3d667ec37fd301a4d509a5482",
-  "notes": "修复更新源旧缓存导致1.0.5误报最新1.0.3；多源并行取最高有效版本；原生修复需覆盖安装1.0.8一次，保留学习进度"
+  "versionName": "1.0.9",
+  "versionCode": 109,
+  "wgt": "EnglishQuest-v1.0.9.wgt",
+  "wgtSize": 8070350,
+  "wgtSha256": "b0e03a12db8cba242eca8fd19db5756a734e92decc02b3a31fc6006535ae0641",
+  "notes": "修复更新包下载失败不换源、资源替换中断恢复、版本记录滞后及教材文件漏检；原生修复需覆盖安装1.0.9 APK"
 }

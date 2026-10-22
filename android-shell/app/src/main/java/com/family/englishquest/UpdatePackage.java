@@ -17,7 +17,7 @@ public final class UpdatePackage {
     private static final String[] CORE_FILES = {
             "index.html", "manifest.json", "css/style.css", "css/learning.css", "css/care.css",
             "js/app.js", "js/update.js", "js/learning.js", "js/care.js", "data/grade1.js",
-            "data/grade2.js", "data/grade3.js", "data/phonics.js", "data/vocabulary.js"
+            "data/grade2.js", "data/grade3.js", "data/phonics.js", "data/vocabulary.js", "data/textbook.js"
     };
 
     public static void verifyAndExtract(File archive, File target, long expectedSize, String expectedHash) throws Exception {

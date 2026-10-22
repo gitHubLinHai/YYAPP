@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 JAVA = Path(os.environ.get('YYAPP_SDK_JAVA_HOME', r'C:\Program Files\Unity 6000.0.59f2\Editor\Data\PlaybackEngines\AndroidPlayer\OpenJDK')) / 'bin'
 CORE = ['index.html', 'manifest.json', 'css/style.css', 'css/learning.css', 'css/care.css',
         'js/app.js', 'js/update.js', 'js/learning.js', 'js/care.js', 'data/grade1.js',
-        'data/grade2.js', 'data/grade3.js', 'data/phonics.js', 'data/vocabulary.js']
+        'data/grade2.js', 'data/grade3.js', 'data/phonics.js', 'data/vocabulary.js', 'data/textbook.js']
 
 
 def archive(files):
@@ -72,6 +72,7 @@ public class CheckPackage {
     for missing in CORE:
         check(archive([(name, data) for name, data in files if name != missing]), False)
     check(archive([(name, b'' if name == 'js/app.js' else data) for name, data in files]), False)
+    check(archive([(name, b'' if name == 'data/textbook.js' else data) for name, data in files]), False)
     check(archive(files + [('../old/index.html', b'overwrite')]), False)
     with warnings.catch_warnings():
         warnings.simplefilter('ignore', UserWarning)

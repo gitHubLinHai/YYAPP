@@ -1084,6 +1084,10 @@
     setTimeout(function () {
       var updateBox = null;
       window.AppUpdate.startAuto(function (st) {
+        if (st.state === 'uptodate' && updateBox && updateBox.isConnected) {
+          updateBox.parentNode.remove();
+          updateBox = null;
+        }
         if ((st.state === 'waitingwifi' || st.state === 'downloading' || st.state === 'installed') && (!updateBox || !updateBox.isConnected)) {
           var overlay = document.createElement('div');
           overlay.id = 'updateOverlay';

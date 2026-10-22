@@ -297,6 +297,15 @@ const base = 'http://127.0.0.1:8123';
     await startup.evaluate(() => __updCb({ state: 'found', version: '1.0.3' }));
     assert.equal(await startup.evaluate(() => window.wifiDownload), 1, 'Wi-Fi 自动下载不需要点击');
     assert.match(await startup.locator('#updateOverlay').textContent(), /下载并安装/);
+    // 下载时再次检查发现版本已一致，弹层必须撤掉，否则所有导航永久被挡住。
+    await startup.evaluate(() => __updCb({ state: 'uptodate', version: '1.0.2' }));
+    assert.equal(await startup.locator('#updateOverlay').count(), 0, '当前版本状态应解除自动更新弹层');
+    await startup.locator('#parentBtn').click();
+    await startup.locator('#back').click();
+    await startup.locator('#parentBtn').waitFor();
+    await startup.locator('#parentBtn').click();
+    await startup.locator('#checkUpd').click();
+    await startup.evaluate(() => __updCb({ state: 'found', version: '1.0.3' }));
     await startup.evaluate(() => __updCb({ state: 'done', version: '1.0.3' }));
     await startup.locator('#continueBtn').waitFor();
     await startup.close();
