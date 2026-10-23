@@ -322,6 +322,7 @@
       '<div class="card"><div class="rp-title">护眼、时长与进度保护</div><button class="btn green" id="careSettingsBtn">护眼与使用时长</button><button class="btn ghost" id="backupBtn" style="margin-top:14px">备份与恢复进度</button></div>' +
       '<div class="card"><div class="rp-title">🔄 版本与更新</div>' +
       '<div class="rp-note">当前版本：' + (window.AppUpdate ? window.AppUpdate.version() : '未知') +
+      (window.AppUpdate && window.AppUpdate.env() === 'native' ? '<br>' + (window.AppUpdate.supportsResume() ? '下载中断后支持断点续传' : '当前安装包不支持断点续传，需覆盖安装新版 APK（不卸载）') : '') +
       (window.AppUpdate && window.AppUpdate.env() !== 'preview' ? '' : '<br>（网页预览不支持在线更新，手机上可用）') + '</div>' +
       '<button class="btn blue" id="checkUpd">检查更新</button>' +
       '<div id="updBox" style="margin-top:10px"></div></div>' +
@@ -362,6 +363,7 @@
     } else if (st.state === 'downloading') {
       box.innerHTML = '<div class="qbar"><i></i></div><p aria-live="polite">正在下载并安装更新，请稍候…</p>';
       $('i', box).style.width = Math.round(st.progress * 100) + '%';
+      $('p', box).textContent = st.progress < 1 ? '正在下载并安装更新… ' + Math.floor(st.progress * 100) + '%' : '下载完成，正在校验并安装…';
     } else if (st.state === 'installed') {
       box.textContent = '更新已安装，正在自动载入新版…';
       persist();

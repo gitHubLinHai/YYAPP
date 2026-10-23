@@ -155,6 +155,8 @@ public class MainActivity extends Activity {
     }
 
     private class Bridge {
+        private volatile JSONObject recentUpdate;
+        private volatile long recentAt;
         /** 网页完成首页二次返回确认并保存进度后关闭应用。 */
         @JavascriptInterface
         public void exitApp() {
@@ -175,6 +177,9 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface
         public void applyWifiUpdate(final String cb) { update(cb, true); }
+
+        @JavascriptInterface
+        public boolean supportsResume() { return true; }
 
 
         /** 当前生效资源版本，供 JS 显示在家长中心 */
@@ -202,6 +207,7 @@ public class MainActivity extends Activity {
                             return;
                         }
                         int next = remote.optInt("versionCode", 0);
+                        recentUpdate = remote; recentAt = android.os.SystemClock.elapsedRealtime();
                         JSONObject o = new JSONObject();
                         if (next < activeCode()) {
                             cbError(cb, "更新源版本落后于当前 v" + activeName() + "，暂时无法确认更新，请稍后重试");
@@ -238,7 +244,9 @@ public class MainActivity extends Activity {
                     try {
                         Network wifi = wifiOnly ? wifiNetwork() : null;
                         if (wifiOnly && wifi == null) { waitingWifi(cb); return; }
-                        JSONObject remote = fetchVersionJson(wifi);
+                        JSONObject remote = recentUpdate;
+                        if (remote == null || android.os.SystemClock.elapsedRealtime() - recentAt >= 60000)
+                            remote = fetchVersionJson(wifi);
                         if (remote == null) {
                             cbError(cb, "网络不通，稍后再试");
                             return;
@@ -257,10 +265,14 @@ public class MainActivity extends Activity {
                         downloadUpdate(remote, archive, tmp, wifi, wifiOnly, cb);
                         JSONObject packaged = new JSONObject(readLocal(new File(tmp, "manifest.json")));
                         if (packaged.optInt("versionCode") != remote.optInt("versionCode")
-                                || !packaged.optString("versionName").equals(remote.optString("versionName")))
+                                || !packaged.optString("versionName").equals(remote.optString("versionName"))) {
+                            UpdateDownload.discard(archive);
                             throw new Exception("更新包版本与更新信息不一致，旧版已保留");
+                        }
                         if (wifiOnly && !wifi.equals(wifiNetwork())) { waitingWifi(cb); return; }
                         UpdateStorage.install(tmp, wwwDir);
+                        try { UpdateDownload.discard(archive); } catch (java.io.IOException ignored) { }
+                        getSharedPreferences("eq_update", MODE_PRIVATE).edit().remove("pending").commit();
                         JSONObject ok = new JSONObject();
                         ok.put("state", "done");
                         ok.put("version", remote.optString("versionName"));
@@ -269,15 +281,15 @@ public class MainActivity extends Activity {
                         if (wifiOnly && wifiNetwork() == null) waitingWifi(cb);
                         else cbError(cb, String.valueOf(ex));
                     } finally {
-                        deleteRecursive(archive); deleteRecursive(tmp);
+                        deleteRecursive(tmp);
                         UPDATING.set(false);
                     }
                 }
             }).start();
         }
 
-        private void downloadUpdate(JSONObject remote, File archive, File tmp, Network wifi,
-                                    boolean wifiOnly, String cb) throws Exception {
+        private void downloadUpdate(JSONObject remote, File archive, File tmp, final Network wifi,
+                                    final boolean wifiOnly, final String cb) throws Exception {
             long expectedSize = remote.optLong("wgtSize", 0);
             String expectedHash = remote.optString("wgtSha256", "");
             List<String> bases = new ArrayList<>();
@@ -288,32 +300,29 @@ public class MainActivity extends Activity {
                 if (wifiOnly && !wifi.equals(wifiNetwork())) throw new java.io.IOException("Wi-Fi 已断开，等待重连后重试");
                 deleteRecursive(tmp);
                 if (!tmp.mkdirs()) throw new java.io.IOException("无法创建更新目录，请检查存储空间");
-                URL u = new URL(base + remote.optString("wgt") + "?t=" + System.currentTimeMillis());
-                HttpURLConnection c = (HttpURLConnection) (wifi == null ? u.openConnection() : wifi.openConnection(u));
-                c.setConnectTimeout(10000);
-                c.setReadTimeout(30000);
+                URL u = new URL(base + remote.optString("wgt"));
                 try {
-                    if (c.getResponseCode() != 200) throw new java.io.IOException("下载失败 HTTP " + c.getResponseCode());
-                    long done = 0, lastPost = 0;
-                    try (InputStream input = c.getInputStream(); FileOutputStream output = new FileOutputStream(archive)) {
-                        byte[] buf = new byte[16384];
-                        int n;
-                        while ((n = input.read(buf)) != -1) {
-                            if (wifiOnly && !wifi.equals(wifiNetwork())) throw new java.io.IOException("Wi-Fi 已断开");
-                            done += n;
-                            if (done > expectedSize) throw new java.io.IOException("更新包大小超出预期");
-                            output.write(buf, 0, n);
-                            if (System.currentTimeMillis() - lastPost > 300) {
-                                lastPost = System.currentTimeMillis();
-                                JSONObject p = new JSONObject(); p.put("state", "downloading");
-                                p.put("progress", (double) done / expectedSize); jsCallback(cb, p);
-                            }
-                        }
-                    }
-                    UpdatePackage.verifyAndExtract(archive, tmp, expectedSize, expectedHash);
+                    UpdateDownload.fetch(u, archive, expectedSize, expectedHash,
+                            new UpdateDownload.Connection() {
+                                public HttpURLConnection open(URL url) throws Exception {
+                                    return (HttpURLConnection) (wifi == null ? url.openConnection() : wifi.openConnection(url));
+                                }
+                            },
+                            new UpdateDownload.Check() {
+                                public void run() throws java.io.IOException {
+                                    if (wifiOnly && !wifi.equals(wifiNetwork())) throw new java.io.IOException("Wi-Fi 已断开");
+                                }
+                            },
+                            new UpdateDownload.Progress() {
+                                public void update(long done, long total) throws Exception {
+                                    JSONObject p = new JSONObject(); p.put("state", "downloading");
+                                    p.put("progress", (double) done / total); jsCallback(cb, p);
+                                }
+                            });
+                    try { UpdatePackage.verifyAndExtract(archive, tmp, expectedSize, expectedHash); }
+                    catch (Exception invalid) { UpdateDownload.discard(archive); throw invalid; }
                     return;
                 } catch (Exception e) { failure = e; }
-                finally { c.disconnect(); }
             }
             throw new java.io.IOException("所有更新包下载源均失败，当前版本已保留，请稍后重试", failure);
         }
@@ -372,6 +381,22 @@ public class MainActivity extends Activity {
         return new String(bo.toByteArray(), "UTF-8");
     }
 
+    /** 已经发现的新版本持久保存，旧CDN响应或暂时离线不能抹掉待完成更新。 */
+    private JSONObject pendingUpdate() {
+        try {
+            String text = getSharedPreferences("eq_update", MODE_PRIVATE).getString("pending", "");
+            if (text.isEmpty()) return null;
+            JSONObject o = new JSONObject(text);
+            if (o.optInt("versionCode") <= activeCode()) {
+                getSharedPreferences("eq_update", MODE_PRIVATE).edit().remove("pending").commit();
+                return null;
+            }
+            if (o.optString("wgt").matches("[A-Za-z0-9._-]+\\.wgt") && o.optLong("wgtSize", 0) > 0
+                    && o.optString("wgtSha256").matches("[a-fA-F0-9]{64}")) return o;
+        } catch (Exception ignored) { }
+        return null;
+    }
+
     /** 并行读取各源，缓存旧版本不能遮住其他源的新版本。 */
     private JSONObject fetchVersionJson() throws Exception { return fetchVersionJson(null); }
 
@@ -410,7 +435,7 @@ public class MainActivity extends Activity {
             });
         }
         try {
-            JSONObject best = null;
+            JSONObject best = pendingUpdate();
             for (Future<JSONObject> result : pool.invokeAll(tasks, 9, TimeUnit.SECONDS)) {
                 if (result.isCancelled()) continue;
                 try {
@@ -419,6 +444,8 @@ public class MainActivity extends Activity {
                         best = candidate;
                 } catch (Exception ignored) { }
             }
+            if (best != null && best.optInt("versionCode") > activeCode())
+                getSharedPreferences("eq_update", MODE_PRIVATE).edit().putString("pending", best.toString()).commit();
             return best;
         } finally { pool.shutdownNow(); }
     }

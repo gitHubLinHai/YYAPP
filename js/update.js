@@ -197,5 +197,9 @@ window.AppUpdate = (function () {
       window.location.replace(url.href);
     }
   }
-  return { check: check, startAuto: startAuto, network: network, env: env, version: version, restart: restart };
+  function supportsResume() {
+    try { return env() === 'native' && !!window.AndroidBridge.supportsResume && window.AndroidBridge.supportsResume() === true; }
+    catch (e) { return false; }
+  }
+  return { check: check, startAuto: startAuto, network: network, env: env, version: version, restart: restart, supportsResume: supportsResume };
 })();

@@ -1,8 +1,8 @@
 {
-  "versionName": "1.0.11",
-  "versionCode": 111,
-  "wgt": "EnglishQuest-v1.0.11.wgt",
-  "wgtSize": 11343975,
-  "wgtSha256": "7f786771e3632cd1892a06d663f68cd97faa905360b9c91d6e637ea3779f1f0a",
-  "notes": "修复热更后仍显示旧页面、必须杀进程才生效：入口强制切换，脚本词库和样式按版本刷新"
+  "versionName": "1.0.12",
+  "versionCode": 112,
+  "wgt": "EnglishQuest-v1.0.12.wgt",
+  "wgtSize": 11344160,
+  "wgtSha256": "87e34895cce9635ddbdc8cef499f54bf0b879b4a1c41e78f0db135ba3c6069b6",
+  "notes": "新增断点续传、保存待完成更新、防止中断后旧源误报、减少重复检查；续传需覆盖安装1.0.12 APK"
 }

@@ -21,6 +21,7 @@ import java.util.concurrent.*;
 import java.nio.file.*;
 import com.family.englishquest.UpdatePackage;
 import com.family.englishquest.UpdateStorage;
+import com.family.englishquest.UpdateDownload;
 public class NativeUpdateTest {
     static String[] CDNS = {"https://one/", "https://two/", "https://three/"};
     static volatile String[] replies;
@@ -63,16 +64,19 @@ public class NativeUpdateTest {
         NativeUpdateTest test = new NativeUpdateTest();
         File archive = new File(root, "test.wgt"), tmp = new File(root, "incoming");
         for (String first : new String[]{"404", "timeout", "corrupt"}) {
+            UpdateDownload.discard(archive);
             packageReplies = new String[]{first, "ok", "ok"}; packageAttempts = 0;
             test.downloadUpdate(remote, archive, tmp, null, false, "cb");
             require(packageAttempts == 2, "fallback after " + first);
             require(new File(tmp, "data/textbook.js").isFile(), "verified complete package");
         }
+        UpdateDownload.discard(archive);
         packageReplies = new String[]{"404", "timeout", "corrupt"}; packageAttempts = 0;
         try { test.downloadUpdate(remote, archive, tmp, null, false, "cb"); throw new AssertionError("all sources failed"); }
         catch (IOException expected) { }
         require(packageAttempts == 3, "try all download sources");
         Network wifi = new Network(); connectedWifi = wifi;
+        UpdateDownload.discard(archive);
         packageReplies = new String[]{"dropwifi", "ok", "ok"}; packageAttempts = 0;
         try { test.downloadUpdate(remote, archive, tmp, wifi, true, "cb"); throw new AssertionError("wifi disconnect must stop"); }
         catch (IOException expected) { }
@@ -81,8 +85,13 @@ public class NativeUpdateTest {
     File wwwDir;
     static final int MODE_PRIVATE = 0;
     static class Prefs {
+        static String pending;
         int getInt(String key, int fallback) { return 105; }
-        String getString(String key, String fallback) { return "1.0.5"; }
+        String getString(String key, String fallback) { return key.equals("pending") ? (pending == null ? fallback : pending) : "1.0.5"; }
+        Prefs edit() { return this; }
+        Prefs putString(String key, String value) { pending = value; return this; }
+        Prefs remove(String key) { pending = null; return this; }
+        boolean commit() { return true; }
     }
     Prefs getSharedPreferences(String name, int mode) { return new Prefs(); }
     static class Network {
@@ -93,7 +102,9 @@ public class NativeUpdateTest {
         final Map<String,Object> values = new HashMap<>();
         JSONObject() { }
         JSONObject(String body) {
-            int code = Integer.parseInt(body);
+            String[] saved = body.split("\\|", 2);
+            int code = Integer.parseInt(saved[0]);
+            if (saved.length == 2) values.put("_base", saved[1]);
             values.put("versionCode", code);
             values.put("versionName", "1.0." + (code - 100));
             values.put("wgt", "EnglishQuest.wgt");
@@ -108,8 +119,13 @@ public class NativeUpdateTest {
         String optString(String key) { Object v=values.get(key); return v == null ? "" : v.toString(); }
         String optString(String key, String fallback) { return values.containsKey(key) ? optString(key) : fallback; }
         void put(String key, Object value) { values.put(key, value); }
+        public String toString() { return optInt("versionCode") + "|" + optString("_base"); }
     }
     static void verify(String[] data, int expected, String host, boolean wifi) throws Exception {
+        Prefs.pending = null;
+        verifyRemembered(data, expected, host, wifi);
+    }
+    static void verifyRemembered(String[] data, int expected, String host, boolean wifi) throws Exception {
         replies = data; started = new CountDownLatch(3);
         JSONObject result = new NativeUpdateTest().fetchVersionJson(wifi ? new Network() : null);
         if (expected == 0) {
@@ -164,6 +180,12 @@ public class NativeUpdateTest {
         verify(new String[]{"103", "104", null}, 104, "two", false);
         verify(new String[]{null, null, null}, 0, "", false);
         verify(new String[]{"108", "107", "103"}, 108, "one", true);
+        verify(new String[]{"110", "111", "109"}, 111, "two", false);
+        verifyRemembered(new String[]{"110", "109", null}, 111, "two", false);
+        verifyRemembered(new String[]{null, null, null}, 111, "two", false);
+        Prefs.pending = "103|https://one/";
+        verifyRemembered(new String[]{null, null, null}, 0, "", false);
+        require(Prefs.pending == null, "clear pending update already installed");
         System.out.println("Native source selection passed: parallel, stale primary, timeout, invalid integrity, all stale, all offline, Wi-Fi binding path.");
     }
 '''
@@ -172,7 +194,7 @@ harness = harness.replace('    public static void main', method + versions + dow
 with tempfile.TemporaryDirectory(prefix='yyapp-update-') as temp:
     work = Path(temp)
     (work / 'NativeUpdateTest.java').write_text(harness, encoding='utf-8')
-    subprocess.run([str(java / 'javac.exe'), '-encoding', 'UTF-8', '-d', str(work), str(root / 'android-shell/app/src/main/java/com/family/englishquest/UpdatePackage.java'), str(root / 'android-shell/app/src/main/java/com/family/englishquest/UpdateStorage.java'), str(work / 'NativeUpdateTest.java')], check=True)
+    subprocess.run([str(java / 'javac.exe'), '-encoding', 'UTF-8', '-d', str(work), str(root / 'android-shell/app/src/main/java/com/family/englishquest/UpdatePackage.java'), str(root / 'android-shell/app/src/main/java/com/family/englishquest/UpdateStorage.java'), str(root / 'android-shell/app/src/main/java/com/family/englishquest/UpdateDownload.java'), str(work / 'NativeUpdateTest.java')], check=True)
     package = work / 'fixture.wgt'
     core = ['index.html', 'manifest.json', 'css/style.css', 'css/learning.css', 'css/care.css',
             'js/app.js', 'js/update.js', 'js/learning.js', 'js/care.js', 'data/grade1.js',

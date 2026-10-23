@@ -17,6 +17,9 @@ function native(type) {
   const { window, calls, update } = native();
   assert.equal(update.env(), 'native');
   assert.equal(update.version(), '1.0.2');
+  assert.equal(update.supportsResume(), false, '旧外壳不能冒充支持续传');
+  window.AndroidBridge.supportsResume = () => true;
+  assert.equal(update.supportsResume(), true);
   const states = [];
   update.check(false, st => states.push(st));
   update.check(false, st => assert.equal(st.state, 'busy'));

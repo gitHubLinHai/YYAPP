@@ -7,8 +7,8 @@ android {
         applicationId "com.family.englishquest"
         minSdkVersion 21
         targetSdkVersion 29
-        versionCode 109
-        versionName "1.0.9"
+        versionCode 112
+        versionName "1.0.12"
     }
     buildTypes {
         release { minifyEnabled false }
